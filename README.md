@@ -17,6 +17,8 @@ You copy/install parts of this repo into each product repo.
 ## What You Install Into Product Repos
 
 ### 1. Claude Commands
+**Pre-prequisite: install [Clavix](https://github.com/ClavixDev/Clavix/tree/main) and [OpenSpec](https://github.com/Fission-AI/OpenSpec).**
+
 Copy into the product repo:
 ```
 .claude/commands/
