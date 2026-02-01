@@ -36,6 +36,7 @@ Agents MUST use these artifacts in this priority order:
 - `prd.md` = build-level plan (replaces `project.md`)
 
 ### Folder structure (Authoritative)
+```
 .ops/
 └── build/
     ├── product-vision-strategy.md
@@ -49,6 +50,7 @@ Agents MUST use these artifacts in this priority order:
             ├── tasks.md
             ├── decisions.md
             └── (optional) ui.md, security.md, compliance.md, db-migration-plan.md, etc.
+```
 
 ---
 
