@@ -1,39 +1,113 @@
-# README
+# SDD + Agent Swarm Bootstrap
 
-## Commands customization
-These files need to be pasted inside `.claude/commands/<tool-name>` (eg: `.claude/commands/clavix`)
-- `/clavix:product` [NEW] (Creates high level `product-vision-strategy.md` document) 
-- `/clavix:prd` [UPDATE] (Creates a build version `prd.md` document)
-- `/openspec:proposal` [UPDATE] (Better handoff with Clavix)
-- `/openspec:apply` [UPDATE] (Better handoff with Clavix. Replaced by agents swarm)
-- `/orchestrate` [NEW] (Agent swarm orchestration for implementation)
+This repository is **not a product**.  
+It is a **bootstrap project** that defines **process, agents, commands, and guardrails** to be installed into real product repositories.
 
-## Clavix customization
-1. Add files `prd.md` and `product.md` to `.claude/commands/clavix`.
-2. Type command `/clavix:product` for high level product vision and strategy definition (includes tech constraints and other details) (future plan to break it down into different artifacts `security-baseline.md`, `compliance-baseline.md`, `tech-stack-constraints.md`, `system-invariants.md`).
-3. Type command `/clavix:prd` to create a build/project lvl `prd.md` file that will be consumed by agents.
+It standardizes:
+- Spec-Driven Development (SDD)
+- Clavix → OpenSpec → Agent Swarm flow
+- Claude Code + Cursor usage
+- MCP server integration
+- Non-negotiable engineering and security rules
 
-## OpenSpec customization
-1. Add file `proposal.md` to `.claude/commands/openspec`.
-2. Type command `/openspec:proposal` in Claude terminal.
-3. Paste `AGENTS.openspec.md` to `openspec` folder and rename it to `AGENTS.md`. This file has a proper handoff with OpenSpec and agents swarm and it's following the SDD conventions for this project.
+You copy/install parts of this repo into each product repo.
 
-## CLAUDE.md
-1. Paste `CLAUDE.md` to project's root folder. This file contains global security, identity, & baseline defaults.
-2. Paste `CLAUDE.project.md` to X folder and rename it to `CLAUDE.md`. This file contains execution guardrails (SDD + Next.js + stack).
+---
 
-## Agents configuration
-1. Paste `AGENTS.md` to project's root folder. This file contains the agents' global rules + swarm collaboration.
-2. Paste folder `agents` to the project's root folder.
-- `agents/instructions.md` contains general guidance for agents. It's reffered by agents and other files. Do NOT rename it.
-- `agents/swarm-config.md` contains configurations on agent and teammate mapping to orientate swarm of agents.  It's reffered by agents and other files. Do NOT rename it.
+## What You Install Into Product Repos
 
-## MCP servers configuration
-1. Add `mcp.json` on project root level (for Claude).
-2. Add the same `mcp.json` to `~/.cursor/mcp.json` Cursor in Cursor Settings > Tools & MCP.
-3. Add the same `mcp.json` to `.cursor/mcp.json` project folder.
-4. Add environment variables to `.env` file.
-5. Add one server to local scope eg: `claude mcp add playwright --transport stdio --scope local -- npx -y @playwright/mcp@latest`.
-6. Restart Claude interactive interface (the Claude terminal inside Cursor).
-7. On Claude interactive interface type `/mcp` or `claude mcp list`.
+### 1. Claude Commands
+Copy into the product repo:
+```
+.claude/commands/
+├── clavix/          # product.md, prd.md
+├── openspec/        # proposal.md
+└── orchestrate.md   # swarm entrypoint
+```
 
+Commands:
+- `/clavix:product` → `.ops/build/product-vision-strategy.md`
+- `/clavix:prd` → `.ops/build/v{x}/prd.md`
+- `/openspec:proposal` → `.ops/build/v{x}/epic.md`
+- `/orchestrate` → agent swarm implementation
+- `/openspec:apply` → deprecated
+
+---
+
+### 2. Global Guardrails (Required)
+Copy to product repo root:
+```
+AGENTS.md   # source of truth (rules + swarm collaboration)
+CLAUDE.md   # runtime execution guardrails
+```
+
+If files conflict, **AGENTS.md wins**.
+
+---
+
+### 3. Agent Swarm (Required)
+Copy to product repo root:
+```
+agents/
+```
+
+Must include (do not rename):
+- `agents/instructions.md`
+- `agents/swarm-config.md`
+
+Defines agent roles, tiers, and orchestration rules.
+
+---
+
+### 4. OpenSpec Integration
+For OpenSpec-enabled repos:
+```
+openspec/AGENTS.md
+```
+(renamed from `AGENTS.openspec.md`)
+
+Ensures OpenSpec outputs match `.ops/build/...` and hand off cleanly to the swarm.
+
+---
+
+### 5. MCP Configuration
+Standard MCPs:
+- GitHub, Supabase, Sentry, Stripe, Context7, Playwright
+
+Install in product repo:
+```
+.mcp.json
+```
+
+Also copy to:
+```
+~/.cursor/mcp.json
+```
+
+Add env vars to `.env` (never commit).
+
+Workaround for known Claude Code UI bug:
+```bash
+claude mcp add playwright --transport stdio --scope local -- npx -y @playwright/mcp@latest
+```
+
+Then validate:
+```bash
+claude mcp list
+claude mcp get supabase
+```
+
+---
+
+## SDD Workflow (in Product Repos)
+
+1. `/clavix:product`
+2. `/clavix:prd`
+3. `/openspec:proposal`
+4. `/orchestrate .ops/build/v{x}/<feature-name>/`
+
+The orchestrator enforces:
+- spec → tasks → code
+- MCP preflight + snapshots
+- tiered agent execution
+- no guessing or drift
