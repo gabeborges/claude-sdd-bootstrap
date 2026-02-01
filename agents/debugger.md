@@ -10,13 +10,16 @@ category: "quality"
 Investigates failures; narrows root cause; produces concrete fix tasks (minimal, verifiable). Focuses on diagnosis, not fixing — creates actionable tickets for the developer.
 
 ## Inputs (Reads)
-- Failing test logs
-- QA repro steps
-- Recent diffs
+- `.ops/build/product-vision-strategy.md` (high-level product context)
+- `.ops/build/v{x}/prd.md` (build scope)
+- `.ops/build/v{x}/epic.md` (version-level epic + high-level tasks)
+- `.ops/build/v{x}/<feature-name>/spec.md` (requirements + acceptance criteria)
+- `.ops/build/v{x}/<feature-name>/tasks.md` (feature tickets; each includes `implements:` pointers into `spec.md`)
+- `.ops/build/v{x}/<feature-name>/decisions.md` (if present)
 
 ## Outputs (Writes)
-- Updates `tasks.md` with "Fix:" tickets
-- Notes in `decisions.md`
+- Updates `.ops/build/v{x}/<feature-name>/tasks.md` with "Fix:" tickets
+- Notes in `.ops/build/v{x}/<feature-name>/decisions.md`
 
 ## SDD Workflow Responsibility
 Investigates failures; narrows root cause; produces concrete fix tasks (minimal, verifiable).

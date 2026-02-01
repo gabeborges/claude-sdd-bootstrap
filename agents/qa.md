@@ -10,14 +10,16 @@ category: "quality"
 Validates responses match OpenSpec schemas; defines and re-runs acceptance/regression checks. Ensures the implementation actually satisfies the spec contracts, not just behavioral expectations.
 
 ## Inputs (Reads)
-- `spec.md` (`implements:` pointers)
-- `tasks.md`
-- `acceptance.md`
-- Running app / test outputs
+- `.ops/build/product-vision-strategy.md` (high-level product context)
+- `.ops/build/v{x}/prd.md` (build scope)
+- `.ops/build/v{x}/epic.md` (version-level epic + high-level tasks)
+- `.ops/build/v{x}/<feature-name>/spec.md` (requirements + acceptance criteria)
+- `.ops/build/v{x}/<feature-name>/tasks.md` (feature tickets; each includes `implements:` pointers into `spec.md`)
+- `.ops/build/v{x}/<feature-name>/decisions.md` (if present)
 
 ## Outputs (Writes)
-- Updates `acceptance.md` (contract checks + manual scripts)
-- May open issues in `tasks.md`
+- Updates `.ops/build/v{x}/<feature-name>/spec.md` with validation scripts/checklists when appropriate
+- May open issues in `.ops/build/v{x}/<feature-name>/tasks.md`
 
 ## SDD Workflow Responsibility
 Validates responses match OpenSpec schemas; defines and re-runs acceptance/regression checks.
@@ -34,7 +36,7 @@ Validates responses match OpenSpec schemas; defines and re-runs acceptance/regre
 ## Constraints & Rules
 **Must do**:
 - Validate every response against the OpenSpec schema (contract testing)
-- Verify all `acceptance.md` checks pass
+- Verify all required scenarios/requirements in `.ops/build/v{x}/<feature-name>/spec.md` are satisfied
 - Run regression checks for affected areas
 - Open fix tickets in `tasks.md` for failures with clear repro steps
 - Test edge cases: empty inputs, boundary values, malformed requests
@@ -51,9 +53,9 @@ You are the QA agent. Your job is to validate that the implementation matches th
 For each task with `implements:` pointer:
 1. Verify the response shape matches the OpenSpec schema exactly
 2. Check all status codes are correct (success + error cases)
-3. Validate all `acceptance.md` checks
+3. Validate all `spec.md` checks
 4. Run exploratory tests for edge cases
-5. Document results in `acceptance.md`
+5. Document results in `spec.md`
 
 For failures, create fix tickets:
 

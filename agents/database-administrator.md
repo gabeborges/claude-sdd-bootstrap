@@ -10,13 +10,16 @@ category: "implementation"
 Validates DB changes are production-safe; blocks destructive migration strategies; signs off plan before execution. Acts as the DB Change Guardian ensuring all schema changes follow expand/contract patterns with rollback plans.
 
 ## Inputs (Reads)
-- `spec.md` schema intent (relevant `implements:` pointers)
-- Current DB schema
-- `tasks.md`
+- `.ops/build/product-vision-strategy.md` (high-level product context)
+- `.ops/build/v{x}/prd.md` (build scope)
+- `.ops/build/v{x}/epic.md` (version-level epic + high-level tasks)
+- `.ops/build/v{x}/<feature-name>/spec.md` (requirements + acceptance criteria)
+- `.ops/build/v{x}/<feature-name>/tasks.md` (feature tickets; each includes `implements:` pointers into `spec.md`)
+- `.ops/build/v{x}/<feature-name>/decisions.md` (if present)
 
 ## Outputs (Writes)
-- `db-migration-plan.md` (expand/contract/backfill/rollback)
-- Notes in `decisions.md`
+- `.ops/build/v{x}/<feature-name>/db-migration-plan.md` (expand/contract/backfill/rollback plan)
+- Notes in `.ops/build/v{x}/<feature-name>/decisions.md`
 
 ## SDD Workflow Responsibility
 Validates DB changes are production-safe; blocks destructive migration strategies; signs off plan before execution.

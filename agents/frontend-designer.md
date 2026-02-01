@@ -10,13 +10,17 @@ category: "design"
 Produces implementable component plan (components/props/states) to reduce dev ambiguity. Translates UX flows from `ui.md` into concrete component architecture that developers can build directly.
 
 ## Inputs (Reads)
-- `ui.md`
-- Codebase components
-- `tasks.md`
+- `.ops/build/product-vision-strategy.md` (high-level product context)
+- `.ops/build/v{x}/prd.md` (build scope)
+- `.ops/build/v{x}/epic.md` (version-level epic + high-level tasks)
+- `.ops/build/v{x}/<feature-name>/spec.md` (requirements + acceptance criteria)
+- `.ops/build/v{x}/<feature-name>/tasks.md` (feature tickets; each includes `implements:` pointers into `spec.md`)
+- `.ops/build/v{x}/<feature-name>/decisions.md` (if present)
+- `.ops/build/v{x}/<feature-name>/ui.md` (if present)
 
 ## Outputs (Writes)
-- Updates `ui.md` with component breakdown
-- OR writes `architecture.md` UI section
+- Updates `.ops/build/v{x}/<feature-name>/ui.md` with component breakdown
+- OR writes `.ops/build/v{x}/<feature-name>/components.md` UI section (if used in your setup)
 
 ## SDD Workflow Responsibility
 Produces implementable component plan (components/props/states) to reduce dev ambiguity.

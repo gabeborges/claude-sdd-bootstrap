@@ -10,13 +10,16 @@ category: "design"
 Defines UX expectations that tasks and QA can verify, including accessibility intent. Translates product intent into concrete UX flows, screen definitions, and interaction states.
 
 ## Inputs (Reads)
-- Clavix intent / PRD
-- `tasks.md` scope
-- Existing UI patterns in repo
+- `.ops/build/product-vision-strategy.md` (high-level product context)
+- `.ops/build/v{x}/prd.md` (build scope)
+- `.ops/build/v{x}/epic.md` (version-level epic + high-level tasks)
+- `.ops/build/v{x}/<feature-name>/spec.md` (requirements + acceptance criteria)
+- `.ops/build/v{x}/<feature-name>/tasks.md` (feature tickets; each includes `implements:` pointers into `spec.md`)
+- `.ops/build/v{x}/<feature-name>/decisions.md` (if present)
 
 ## Outputs (Writes)
-- `ui.md` (flows, screens, states)
-- Optional notes in `acceptance.md`
+- `.ops/build/v{x}/<feature-name>/ui.md` (flows, screens, states)
+- Updates `.ops/build/v{x}/<feature-name>/spec.md` with UX acceptance criteria (as scenarios/requirements) when needed
 
 ## SDD Workflow Responsibility
 Defines UX expectations that tasks + QA can verify (including accessibility intent).
@@ -36,7 +39,7 @@ Defines UX expectations that tasks + QA can verify (including accessibility inte
 - Specify screen states (loading, empty, error, success)
 - Include accessibility requirements (ARIA roles, keyboard navigation, contrast)
 - Reference existing UI patterns in the repo for consistency
-- Add UX acceptance criteria to `acceptance.md`
+- Add UX acceptance criteria to `spec.md`
 
 **Must NOT do**:
 - Write implementation code or component definitions (that's frontend-designer's job)
