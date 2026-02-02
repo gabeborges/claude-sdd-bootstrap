@@ -68,6 +68,7 @@ Each agent's system prompt is read from `.claude/agents/<agent-name>.md` and com
 
 `.ops/ (product + global constraints)`
 * product-vision-strategy.md  
+* ui-design-system.md (if present)
 * product-principles.md (not yet implemented)
 * tech-stack-constraints.md (not yet implemented)
 * system-invariants.md (not yet implemented)
