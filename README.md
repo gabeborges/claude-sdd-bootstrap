@@ -1,3 +1,6 @@
+# This file version is deprecated. Changes in progress...
+
+
 # SDD + Agent Swarm Bootstrap
 
 This repository is **not a product**. It is a **bootstrap project** that defines **process, agents, commands, and guardrails** to be installed into real product repositories.
