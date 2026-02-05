@@ -1,3 +1,14 @@
+## Mandatory Pre-Flight (DO NOT SKIP)
+
+If orchestrating a build path (`.ops/build/v{x}`):
+
+- If `specs.md` were created or updated in this run
+  AND `./ops/build/system-design.yaml` was not updated AFTER that:
+    → You MUST run `architect` next.
+    → You MUST NOT run `project-task-planner`.
+
+Violation of this rule is an ERROR.
+
 # /orchestrate — SDD Swarm Orchestration
 
 You are the **Workflow Orchestrator** (team leader). Your job is to execute the SDD build phase for a feature by spawning specialized agents as teammates, managing tasks, and enforcing the dependency DAG.
@@ -10,7 +21,7 @@ Feature path: `$ARGUMENTS` (e.g., `.ops/build/v1/auth`)
 
 ### 1. Read Artifacts
 
-Read `$ARGUMENTS/spec.md` and `$ARGUMENTS/tasks.md`. If `tasks.md` is missing or empty, flag that `project-task-planner` is required (Tier 2).
+Read `$ARGUMENTS/specs.md` and `.ops/build/v{x}/sytem-design.yaml` and `$ARGUMENTS/tasks.md`. If `specs.md` is missing or empty, flag that `spec-writer` is required (Tier 2). If `tasks.md` is missing or empty, flag that `project-task-planner` is required (Tier 3).
 
 ### 2. Auto-Detect Required Agents
 
@@ -22,7 +33,6 @@ Scan task content and spec for keywords to determine which optional agents to sp
 | `auth`, `secret`, `token`, `credential`, `oauth`, `jwt`, `session`, `permission`, `rbac` | security-engineer (T3), security-auditor (T6) |
 | `phi`, `pii`, `hipaa`, `compliance`, `audit trail`, `data retention`, `baa`, `encryption at rest` | compliance-engineer (T3), compliance-auditor (T6) |
 | `schema`, `migration`, `table`, `column`, `index`, `database`, `db`, `foreign key`, `sql` | database-administrator (T4) |
-
 
 **UI system pre-step (when UI is detected):**
 - Check for `.ops/ui-design-system.md`.
@@ -49,12 +59,13 @@ Use the `Task` tool to spawn each agent as a `general-purpose` subagent. Build e
 
 **Tier execution order** (wait for each tier to complete before advancing):
 
-- **Tier 1**: `context-manager` — reads all existing artifacts, builds `decisions.md` context
-- **Tier 2** (if needed): `project-task-planner` — generates/refines `tasks.md` from `spec.md`
-- **Tier 3** (if detected): `ui-designer`, `security-engineer`, `compliance-engineer` — run in parallel
-- **Tier 4** (if detected): `frontend-designer`, `database-administrator` — run in parallel
-- **Tier 5**: `fullstack-developer`, `test-automator` — run in parallel
-- **Tier 6**: `qa`, `code-reviewer`, `security-auditor` (if T3 security), `compliance-auditor` (if T3 compliance), `debugger` (if QA opens fix tickets) — run in parallel
+- **Tier 1**: `context-manager` — reads all existing artifacts, builds `decisions-log.md` context
+- **Tier 2** (if needed): `spec-writer` — writes/updates `specs.md` (requirements + acceptance criteria)
+- **Tier 3** (if needed): `project-task-planner` — generates/refines `tasks.md` from `specs.md`
+- **Tier 4** (if detected): `ui-designer`, `security-engineer`, `compliance-engineer` — run in parallel
+- **Tier 5** (if detected): `frontend-designer`, `database-administrator` — run in parallel
+- **Tier 6**: `fullstack-developer`, `test-automator` — run in parallel
+- **Tier 7**: `qa`, `code-reviewer`, `security-auditor` (if T4 security), `compliance-auditor` (if T4 compliance), `debugger` (if QA opens fix tickets) — run in parallel
 
 ### 5. Gate Checking
 
@@ -81,6 +92,14 @@ When all tiers complete successfully:
 
 - **Never implement code yourself** — delegate to the appropriate agent
 - **Never skip gates** — security, compliance, QA, and code-review must run
-- **Preserve `implements:` traceability** — every task must trace back to `spec.md`
-- **Log decisions** — ensure context-manager captures routing decisions in `decisions.md`
+- **Preserve `implements:` traceability** — every task must trace back to `specs.md`
+- **Log decisions** — ensure context-manager captures routing decisions in `.ops/build/decisions-log.md`
 - **Respect the DAG** — never run a higher tier before lower tiers complete
+
+- If deviation/spec break is detected, run `knowledge-synthesizer` to update build logs.
+
+
+### Build-level flow addition
+After `spec-writer` generates/updates feature specs for a build version:
+1) Run `architect` to update `./ops/build/system-design.yaml`
+2) If `spec_change_requests` appear, rerun `spec-writer` for impacted features, then rerun `architect`
