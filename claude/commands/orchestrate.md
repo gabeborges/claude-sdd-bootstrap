@@ -59,7 +59,7 @@ Scan specs and tasks for keywords:
 - If present, `ui-designer` and `frontend-designer` MUST follow it
 - For simple one-off pages/components, prefer the `frontend-design` skill
 
-**Always spawn**: context-manager (T1), knowledge-synthesizer (T1), fullstack-developer (T5), test-automator (T5), qa (T6), code-reviewer (T6).
+**Always spawn**: context-manager (T1), fullstack-developer (T5), test-automator (T5), qa (T6), code-reviewer (T6).
 
 ### 3. Create Tasks
 
@@ -79,7 +79,7 @@ Spawn each agent via `Task` tool as `general-purpose` subagent. Build prompt fro
 
 **Tier execution order** (wait for each tier to complete before advancing):
 
-- **Tier 1**: `context-manager`, `knowledge-synthesizer` — read existing artifacts, build context and decision log
+- **Tier 1**: `context-manager` — read existing artifacts, build context and decision log
 - **Tier 2** (if needed): `spec-writer` then `architect` then `database-administrator` (if DB keywords detected) then `project-task-planner` — **sequential, not parallel**. T2 sequence: spec-writer → architect → database-administrator (if DB keywords) → project-task-planner. If `spec-change-requests.yaml` appears after `architect`, rerun `spec-writer` for impacted features, then rerun `architect` before proceeding.
 - **Tier 3** (if detected): `ui-designer`, `security-engineer`, `compliance-engineer` — parallel
 - **Tier 4** (if detected): `frontend-designer` — parallel
@@ -91,7 +91,7 @@ Spawn each agent via `Task` tool as `general-purpose` subagent. Build prompt fro
 Before advancing tiers:
 - Verify all current-tier tasks are `completed`
 - Check for `$ARGUMENTS/spec-change-requests.yaml` — if found, **HALT** (see step 6)
-- If deviation/spec break detected, run `knowledge-synthesizer` to update build logs
+- If deviation/spec break detected, route to `context-manager` for deviation logging
 - Update task statuses via `TaskUpdate`
 
 **Gate: Before T2 project-task-planner:**
@@ -106,6 +106,8 @@ If any teammate creates `spec-change-requests.yaml`:
 - Stop spawning new tiers
 - Notify user with the spec change request content
 - Wait for user instruction before continuing
+
+See AGENTS.md "Spec Change Request Resolution Workflow" section for the full resolution process.
 
 ### 7. Completion
 

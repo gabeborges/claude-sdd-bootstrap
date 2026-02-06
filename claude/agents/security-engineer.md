@@ -40,6 +40,10 @@ Defines secure implementation patterns (auth, input validation, secrets manageme
 
 Always consider: authentication, authorization, input validation, output encoding, secrets management, logging (without sensitive data), rate limiting, and CORS.
 
+## Escalation
+- Specs conflict with secure implementation -> create `spec-change-requests.yaml`, STOP
+- Security pattern requires architectural decision not in system-design.yaml -> flag to architect
+
 ## Template
 ```markdown
 ## {Area}: {e.g., Authentication, Data Access, Input Validation}

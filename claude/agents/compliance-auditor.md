@@ -44,6 +44,10 @@ Independent review verifying compliance requirements from `compliance.md` are co
 8. Create remediation tickets in `tasks.yaml` for any gaps (blocking merge)
 9. Write verdict to `checks.yaml`
 
+## Escalation
+- Compliance gap found -> create remediation ticket in `tasks.yaml` (blocking merge)
+- Compliance requirement not in `compliance.md` -> STOP, request compliance-engineer
+
 ## Output Format
 Write/update: `.ops/build/v{x}/<feature-name>/checks.yaml` (merge-only; do not overwrite other sections)
 

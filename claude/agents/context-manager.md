@@ -54,6 +54,9 @@ Orchestrator routes agent summaries to context-manager when any of these appear:
 4. If a routing trigger keyword is present, record a deviation entry with impact assessment
 5. Update `implementation-status.md` if task/feature status changed
 
+## Escalation
+- Context-manager does not escalate — it records decisions and deviations made by other agents.
+
 ## Entry Formats
 
 ### Decision/State Change

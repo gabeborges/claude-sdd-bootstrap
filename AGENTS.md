@@ -121,6 +121,8 @@ When finishing work, report:
 | Security Auditor | Independent security reviewer | security | `.claude/agents/security-auditor.md` |
 | Compliance Engineer | Compliance-by-design | compliance | `.claude/agents/compliance-engineer.md` |
 | Compliance Auditor | Compliance reviewer | compliance | `.claude/agents/compliance-auditor.md` |
+| SDD Specialist | SDD workflow config creator/auditor | meta | `.claude/agents/sdd-specialist.md` |
+| Claude Code Specialist | CLAUDE.md/AGENTS.md/agent/skill optimizer | meta | `.claude/agents/claude-code-specialist.md` |
 
 ## By Category
 
@@ -152,6 +154,10 @@ When finishing work, report:
 - **Security Auditor** — Independent security review, OWASP checks
 - **Compliance Engineer** — Translates compliance needs into technical requirements
 - **Compliance Auditor** — Independent compliance verification
+
+### Meta (User-Invoked Only)
+- **SDD Specialist** — Creates and audits SDD workflow configuration files (agent definitions, instructions.md, AGENTS.md, swarm-config.md, skills). Not part of automated swarm.
+- **Claude Code Specialist** — Creates and optimizes CLAUDE.md, AGENTS.md, agent files, and skills. Not part of automated swarm.
 
 ## Dependency DAG
 

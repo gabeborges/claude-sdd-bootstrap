@@ -42,6 +42,10 @@ Independent security review of implementations against `security.md` patterns. C
 7. Create remediation tickets in `tasks.yaml` for any findings (blocking merge)
 8. Write verdict to `checks.yaml`
 
+## Escalation
+- Security finding with no spec coverage -> create remediation ticket in `tasks.yaml` (blocking merge)
+- Spec gap discovered -> create `spec-change-requests.yaml` entry
+
 ## Output Format
 Write/update: `.ops/build/v{x}/<feature-name>/checks.yaml` (merge-only; do not overwrite other sections)
 

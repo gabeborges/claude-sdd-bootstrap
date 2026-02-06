@@ -41,6 +41,10 @@ Translates compliance needs (healthcare, financial, legal) into concrete technic
 
 Always consider: PHI/PII classification, encryption (at rest and in transit), audit logging, access controls, data retention, breach notification, and BAA requirements.
 
+## Escalation
+- Compliance constraints conflict with spec -> create `spec-change-requests.yaml`, STOP
+- PHI/PII data flow not classified in spec -> STOP, request clarification
+
 ## Template
 ```markdown
 ## {Regulation/Area}: {e.g., HIPAA Data Handling, Audit Trail}
