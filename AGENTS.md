@@ -85,7 +85,9 @@ If implementation constraints conflict with the spec:
 
 ## Stop Conditions (Ask Before Proceeding)
 
-STOP and ask (do not guess) if:
+**Execution autonomy:** Agents have full permission to create files, install dependencies, run tests/builds, commit locally, and execute commands within the project scope. The stop conditions below apply to SDD workflow decisions and architecture concerns — NOT to routine file/command operations.
+
+**SDD workflow stops** (STOP and ask — do not guess):
 - Target build version `v{x}` is unclear
 - `prd.md` is missing and specs are about to be created
 - `specs.md` is missing, contradictory, or lacks acceptance scenarios
@@ -94,6 +96,11 @@ STOP and ask (do not guess) if:
 - Implementation would require changing requirements or acceptance criteria
 - A security/compliance risk exists (see security rules in CLAUDE.md)
 - Stripe / OAuth / Supabase settings are required but not specified
+
+**Execution stops** (STOP and ask):
+- Pushing to remote repositories (`git push`)
+- Modifying production environments or external systems
+- Destructive operations affecting shared state (see Autonomy & Execution in CLAUDE.md)
 
 ## Definition of Done
 
@@ -114,25 +121,25 @@ When finishing work, report:
 
 | Agent | Role | Category | File |
 |-------|------|----------|------|
-| Workflow Orchestrator | Orchestration + routing | orchestration | `.claude/agents/workflow-orchestrator.md` |
-| Context Manager | Decision log + deviation logger (sole writer) | orchestration | `.claude/agents/context-manager.md` |
-| Spec Writer | Spec authoring + feature breakdown | planning | `.claude/agents/spec-writer.md` |
-| Architect | System design maintainer | planning | `.claude/agents/architect.md` |
-| Database Administrator | Migration strategist / safety gate | planning | `.claude/agents/database-administrator.md` |
-| Project Task Planner | Spec handoff / ticket writer | planning | `.claude/agents/project-task-planner.md` |
-| UI Designer | UX intent + flows | design | `.claude/agents/ui-designer.md` |
-| Frontend Designer | Design-to-implementation translator | design | `.claude/agents/frontend-designer.md` |
-| Fullstack Developer | Primary builder | implementation | `.claude/agents/fullstack-developer.md` |
-| QA | Contract validation + exploratory | quality | `.claude/agents/qa.md` |
-| Test Automator | Automated test implementer | quality | `.claude/agents/test-automator.md` |
-| Debugger | Root-cause investigator | quality | `.claude/agents/debugger.md` |
-| Code Reviewer | Quality gate | quality | `.claude/agents/code-reviewer.md` |
-| Security Engineer | Secure-by-design implementer | security | `.claude/agents/security-engineer.md` |
-| Security Auditor | Independent security reviewer | security | `.claude/agents/security-auditor.md` |
-| Compliance Engineer | Compliance-by-design | compliance | `.claude/agents/compliance-engineer.md` |
-| Compliance Auditor | Compliance reviewer | compliance | `.claude/agents/compliance-auditor.md` |
-| SDD Specialist | SDD workflow config creator/auditor | meta | `.claude/agents/sdd-specialist.md` |
-| Claude Code Specialist | CLAUDE.md/AGENTS.md/agent/skill optimizer | meta | `.claude/agents/claude-code-specialist.md` |
+| Workflow Orchestrator | Orchestration + routing | orchestration | `claude/agents/workflow-orchestrator.md` |
+| Context Manager | Decision log + deviation logger (sole writer) | orchestration | `claude/agents/context-manager.md` |
+| Spec Writer | Spec authoring + feature breakdown | planning | `claude/agents/spec-writer.md` |
+| Architect | System design maintainer | planning | `claude/agents/architect.md` |
+| Database Administrator | Migration strategist / safety gate | planning | `claude/agents/database-administrator.md` |
+| Project Task Planner | Spec handoff / ticket writer | planning | `claude/agents/project-task-planner.md` |
+| UI Designer | UX intent + flows | design | `claude/agents/ui-designer.md` |
+| Frontend Designer | Design-to-implementation translator | design | `claude/agents/frontend-designer.md` |
+| Fullstack Developer | Primary builder | implementation | `claude/agents/fullstack-developer.md` |
+| QA | Contract validation + exploratory | quality | `claude/agents/qa.md` |
+| Test Automator | Automated test implementer | quality | `claude/agents/test-automator.md` |
+| Debugger | Root-cause investigator | quality | `claude/agents/debugger.md` |
+| Code Reviewer | Quality gate | quality | `claude/agents/code-reviewer.md` |
+| Security Engineer | Secure-by-design implementer | security | `claude/agents/security-engineer.md` |
+| Security Auditor | Independent security reviewer | security | `claude/agents/security-auditor.md` |
+| Compliance Engineer | Compliance-by-design | compliance | `claude/agents/compliance-engineer.md` |
+| Compliance Auditor | Compliance reviewer | compliance | `claude/agents/compliance-auditor.md` |
+| SDD Specialist | SDD workflow config creator/auditor | meta | `claude/agents/sdd-specialist.md` |
+| Claude Code Specialist | CLAUDE.md/AGENTS.md/agent/skill optimizer | meta | `claude/agents/claude-code-specialist.md` |
 
 ## By Category
 
@@ -227,9 +234,77 @@ Use `/orchestrate <feature-path>` to run the full SDD build phase automatically.
 Feature workspace: `.ops/build/v{x}/<feature-name>/`
 
 The workflow-orchestrator spawns agents tier-by-tier and auto-detects which optional agents are needed from `tasks.yaml` / `specs.md` content.
-See [.claude/agents/swarm-config.md](.claude/agents/swarm-config.md) for agent-teammate mapping and keyword triggers.
+See [claude/agents/swarm-config.md](claude/agents/swarm-config.md) for agent-teammate mapping and keyword triggers.
+
+## Parallel Execution Strategy
+
+Maximize throughput by parallelizing independent work at every opportunity. Use the Task tool to spawn multiple agents/tasks simultaneously.
+
+### Within-Tier Parallelism
+
+When a tier contains multiple agents, spawn them as parallel Task calls in a single message. Do NOT spawn sequentially if they can run simultaneously.
+
+**Example (Tier 5):**
+- Spawn `fullstack-developer` for implementation tasks
+- Spawn `test-automator` for test generation
+- Both run in parallel, independent of each other
+
+### Within-Feature Task Parallelism
+
+When implementing from `tasks.yaml`, analyze task dependencies. Tasks without `blockedBy` relationships execute in parallel.
+
+**Example:**
+- Task T-001: Implement user model (no dependencies) → start immediately
+- Task T-002: Implement auth service (no dependencies) → start immediately (parallel with T-001)
+- Task T-003: Implement protected routes (`blockedBy: [T-002]`) → wait for T-002
+- Task T-004: Implement billing webhook (no dependencies) → start immediately (parallel with T-001, T-002)
+
+Result: T-001, T-002, T-004 execute in parallel. T-003 waits only for T-002, NOT for T-001 or T-004.
+
+### Cross-Feature Parallelism
+
+When `build-order.yaml` shows independent features (no cross-dependencies), spawn separate agent instances for each feature simultaneously.
+
+**Example:**
+- Feature `user-management` (no dependencies) → spawn fullstack-developer instance
+- Feature `billing` (no dependencies) → spawn separate fullstack-developer instance (parallel)
+- Feature `analytics` (`depends_on: [user-management]`) → wait for user-management completion
+
+### Blocker Handling
+
+If one parallel branch hits a blocker (needs user input, spec ambiguity, missing prerequisite), flag it clearly and continue ALL other branches. Never wait idle.
+
+**Pattern:**
+1. Agent A blocks on missing UI spec → flag: "A blocked: needs ui.md", continue B and C
+2. Agent B completes → report completion, continue C
+3. Agent C blocks on user decision → flag: "C blocked: needs user input on X"
+4. Return status: "B complete. A blocked (needs ui.md). C blocked (needs user input on X)."
+
+### Task Tool Usage Examples
+
+**Parallel tier execution (Tier 5):**
+```
+TaskCreate(task_id="implement-features", agent="fullstack-developer", workspace="...")
+TaskCreate(task_id="generate-tests", agent="test-automator", workspace="...")
+// Both run simultaneously
+```
+
+**Parallel task execution (within feature):**
+```
+TaskCreate(task_id="T-001", agent="fullstack-developer", instructions="Implement user model")
+TaskCreate(task_id="T-002", agent="fullstack-developer", instructions="Implement auth service")
+TaskCreate(task_id="T-004", agent="fullstack-developer", instructions="Implement billing webhook")
+// T-003 spawned later with blockedBy=["T-002"]
+```
+
+**Blocker bypass:**
+```
+// T-001 blocks on user input
+TaskUpdate(task_id="T-001", status="blocked", note="Needs user clarification on X")
+// Continue with T-002, T-004 (independent tasks) immediately — do NOT wait
+```
 
 ## Supporting References
 
-- Agent roles, inputs, outputs: [.claude/agents/instructions.md](.claude/agents/instructions.md)
-- Swarm orchestration config: [.claude/agents/swarm-config.md](.claude/agents/swarm-config.md)
+- Agent roles, inputs, outputs: [claude/agents/instructions.md](claude/agents/instructions.md)
+- Swarm orchestration config: [claude/agents/swarm-config.md](claude/agents/swarm-config.md)

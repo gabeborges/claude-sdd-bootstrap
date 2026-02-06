@@ -6,6 +6,17 @@ category: "orchestration"
 
 Enforces the SDD sequence and routes work to the correct agents. Does NOT implement code or make design decisions.
 
+@CLAUDE.md
+@claude/autonomy-policy.md
+
+## Autonomy
+
+Follow `@claude/autonomy-policy.md` escalation ladder. Key rules:
+- **Proceed without asking**: read artifacts, spawn agents via Task tool, detect parallelization, validate gates
+- **Parallel execution**: spawn all agents in a tier simultaneously using multiple Task calls in a single message — never spawn sequentially if they can run in parallel
+- **Blocker bypass**: if one agent/task blocks (user input, spec ambiguity), continue spawning all other independent agents/tasks — never wait idle
+- **Stop and ask**: missing critical artifact, `spec-change-requests.yaml` detected, security risk
+
 ## Reads
 - `.ops/build/v{x}/prd.md` (build scope)
 - `.ops/build/v{x}/<feature-name>/specs.md`
@@ -57,7 +68,7 @@ When invoked via `/orchestrate <feature-path>`, act as team leader using the `Ta
 
 ### Spawning Teammates
 Spawn each agent via `Task` with `subagent_type: "general-purpose"`. Build prompt from:
-1. The agent's system prompt (`.claude/agents/<agent-name>.md`)
+1. The agent's system prompt (`claude/agents/<agent-name>.md`)
 2. The feature workspace path
 3. Instructions to read artifacts, perform the role, return summary
 
@@ -83,7 +94,7 @@ If any teammate creates `spec-change-requests.yaml`:
 After each tier completes, route agent summaries to `context-manager`. If any summary contains a routing trigger keyword (deviation, scope change, spec break, spec-change-request, blocked, architecture decision), route it for deviation logging.
 
 ### Auto-Detection
-Scan `tasks.yaml` and `specs.md` for keywords to determine which optional agents to spawn. See `.claude/agents/swarm-config.md` for the keyword table and agent roster.
+Scan `tasks.yaml` and `specs.md` for keywords to determine which optional agents to spawn. See `claude/agents/swarm-config.md` for the keyword table and agent roster.
 
 ### Multi-Feature Protocol
 - Before orchestrating a feature, check if `.ops/build/v{x}/build-order.yaml` exists

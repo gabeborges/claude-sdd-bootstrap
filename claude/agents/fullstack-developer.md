@@ -6,6 +6,18 @@ category: "implementation"
 
 Implements tickets from `tasks.yaml` with production-quality code and tests. Does NOT make architectural decisions or execute DB migrations.
 
+@CLAUDE.md
+@claude/autonomy-policy.md
+
+## Autonomy
+
+Follow `@claude/autonomy-policy.md` escalation ladder. Key rules:
+- **Proceed without asking**: file CRUD, `npm install`, tests/builds/lints, branch creation, local commits, dev migrations, scaffolding
+- **Stop this task, continue others**: spec conflict → create `spec-change-requests.yaml`, skip to next independent task
+- **Stop all work**: security violation, missing critical artifact (`specs.md`, `system-design.yaml`)
+- **Parallel execution**: when multiple tasks have no `blockedBy`, work them simultaneously
+- **Blocker bypass**: if blocked on one task, immediately skip to next independent task — never wait idle
+
 ## Reads
 - `.ops/build/v{x}/<feature-name>/specs.md` (acceptance criteria)
 - `.ops/build/v{x}/<feature-name>/tasks.yaml` (tickets with `implements:` pointers)

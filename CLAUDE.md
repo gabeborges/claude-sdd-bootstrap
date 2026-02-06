@@ -16,6 +16,42 @@ Testing: Vitest + Playwright | Package manager: npm | Workflow: SDD (Clavix + Ag
 - Before ANY commit, verify no secrets in staged changes
 - If security conflicts with spec: create `spec-change-requests.yaml` entry and stop
 
+## Autonomy & Execution
+
+### Always Proceed Without Asking
+- Create, edit, delete files within the project directory
+- Install dependencies (`npm install`, `npm add`) required by tasks
+- Run build, test, lint, and type-check commands (any command in Testing Commands section)
+- Create and switch git branches (`git checkout -b`, `git switch`)
+- Run database migrations in development (via `supabase` CLI)
+- Create directories and scaffolding
+- Stage changes and commit locally (`git add`, `git commit`)
+- Run any safe read-only command (`git status`, `git log`, `git diff`, `ls`, `cat`, etc.)
+
+### Always Ask Before
+- Pushing to remote repositories (`git push`, especially `--force`)
+- Modifying `.env` files or environment variables
+- Deleting git branches (`git branch -D` / `-d`)
+- Running destructive database operations in production
+- Changing CI/CD configuration (GitHub Actions, deployment scripts)
+- Any action affecting shared/external systems (webhooks, third-party APIs, production environments)
+- Force operations (`--force`, `--hard`, `-f` on destructive commands like `git reset --hard`, `git clean -f`, `rm -rf`)
+
+### When Blocked on a Decision
+- Flag the blocker clearly with a brief explanation
+- Continue working on all independent/unblocked tasks in parallel
+- Return to the blocked item when user provides input
+- Never let a single blocker halt all progress
+- Use the Task tool to parallelize independent work
+
+### Operating Principles
+- Assume permission to act within the stated scope
+- If scope is unclear, infer the smallest reasonable scope and proceed
+- Do not pause for clarification unless ambiguity affects correctness or security
+- Prefer action over asking — fix forward, don't wait
+- Use parallel task execution (`Task` tool) for independent work items
+- When implementing from `tasks.yaml`, execute tasks in dependency order but parallelize independent tasks
+
 ## Git Identity
 - `user.name = YourGitHubUsername`
 - `user.email = your.email@example.com`

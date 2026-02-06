@@ -40,7 +40,7 @@ The `/orchestrate <feature-path>` slash command executes the SDD build phase usi
 ### How It Works
 
 1. **Entry**: `/orchestrate .ops/build/v{x}/<feature-name>` reads `specs.md` and `tasks.yaml` from the feature workspace, and uses build context from `../prd.md` and `.ops/build/system-design.yaml`
-2. **Auto-detection**: Task and spec content is scanned for keywords to determine which optional agents to spawn (see `.claude/agents/swarm-config.md` for the full keyword table)
+2. **Auto-detection**: Task and spec content is scanned for keywords to determine which optional agents to spawn (see `claude/agents/swarm-config.md` for the full keyword table)
 3. **Task creation**: Each ticket in `tasks.yaml` becomes a `TaskCreate` entry with `implements:` pointers preserved and `addBlockedBy` set per the tier DAG
 4. **Tier-based spawning**: Agents spawn via the `Task` tool as `general-purpose` subagents, tier by tier (see Dependency DAG below)
 5. **Gate checking**: Each tier must complete before the next starts. If any agent creates `spec-change-requests.yaml`, the orchestrator halts and notifies the user
@@ -48,7 +48,7 @@ The `/orchestrate <feature-path>` slash command executes the SDD build phase usi
 
 ### Agent-to-Teammate Mapping
 
-Each agent's system prompt is read from `.claude/agents/<agent-name>.md` and combined with the feature workspace path to form the teammate's prompt. See `.claude/agents/swarm-config.md` for the full roster, tiers, and auto-detection triggers.
+Each agent's system prompt is read from `claude/agents/<agent-name>.md` and combined with the feature workspace path to form the teammate's prompt. See `claude/agents/swarm-config.md` for the full roster, tiers, and auto-detection triggers.
 
 ### Message Protocol
 

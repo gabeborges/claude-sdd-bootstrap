@@ -68,7 +68,7 @@ Scan `specs.md` and `tasks.yaml` content for these keywords:
 When spawning a teammate via the `Task` tool, build the prompt as:
 
 ```
-You are the {agent-name}. {system-prompt-from-.claude/agents/<agent-name>.md}
+You are the {agent-name}. {system-prompt-from-claude/agents/<agent-name>.md}
 
 Feature workspace: .ops/build/v{x}/{feature-name}  (aka `{feature-path}`)
 Build version: v{x} — all work must stay within this version. Do not mix build versions.
