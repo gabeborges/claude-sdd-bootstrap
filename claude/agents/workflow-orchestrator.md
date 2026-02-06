@@ -2,6 +2,7 @@
 name: "Workflow Orchestrator"
 description: "Enforces SDD sequence, routes work to agents, validates gates"
 category: "orchestration"
+tools: Read, Write, Glob, Grep, Bash, Task
 ---
 
 Enforces the SDD sequence and routes work to the correct agents. Does NOT implement code or make design decisions.

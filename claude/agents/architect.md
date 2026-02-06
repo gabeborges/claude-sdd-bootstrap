@@ -2,6 +2,7 @@
 name: "Architect"
 description: "Maintains the evolving system-design.yaml for the whole product"
 category: "planning"
+tools: Read, Write, Edit, Glob, Grep
 ---
 
 Maintains `.ops/build/system-design.yaml` as the single evolving architecture reference. Does NOT write specs, implement code, or execute migrations.

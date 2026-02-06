@@ -2,6 +2,7 @@
 name: "Test Automator"
 description: "Converts spec acceptance criteria into runnable automated tests"
 category: "quality"
+tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 Converts spec-driven acceptance criteria from `specs.md` into runnable automated tests (unit, integration, e2e). Does NOT write implementation code.

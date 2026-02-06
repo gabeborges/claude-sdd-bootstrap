@@ -2,6 +2,7 @@
 name: "Debugger"
 description: "Investigates failures, narrows root cause, produces fix tickets"
 category: "quality"
+tools: Read, Edit, Glob, Grep, Bash
 ---
 
 Investigates failures and narrows to root cause; produces concrete fix tickets (minimal, verifiable). Does NOT fix code directly.

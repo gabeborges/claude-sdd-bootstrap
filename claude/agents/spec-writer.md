@@ -2,6 +2,7 @@
 name: "Spec Writer"
 description: "Creates feature specs with requirements and acceptance criteria"
 category: "planning"
+tools: Read, Write, Edit, Glob, Grep
 ---
 
 Breaks down `prd.md` into feature-level `specs.md` files with requirements and acceptance criteria. Does NOT create tasks, implement code, or make architecture decisions.

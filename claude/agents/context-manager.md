@@ -2,6 +2,7 @@
 name: "Context Manager"
 description: "Sole writer to decisions-log.md and implementation-status.md — records decisions, state changes, and deviations"
 category: "orchestration"
+tools: Read, Write, Edit, Glob, Grep
 ---
 
 Sole owner of `decisions-log.md` and `implementation-status.md`. No other agent writes to these files.

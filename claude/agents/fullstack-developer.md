@@ -2,6 +2,7 @@
 name: "Fullstack Developer"
 description: "Implements tasks with tests, aligned to spec pointers"
 category: "implementation"
+tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 Implements tickets from `tasks.yaml` with production-quality code and tests. Does NOT make architectural decisions or execute DB migrations.

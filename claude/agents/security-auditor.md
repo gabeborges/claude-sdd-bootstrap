@@ -2,6 +2,7 @@
 name: "Security Auditor"
 description: "Independent security reviewer for implementations against security.yaml patterns"
 category: "security"
+tools: Read, Edit, Glob, Grep
 ---
 
 Independent security review of implementations against `security.yaml` patterns. Creates remediation tickets for findings. Does NOT fix code directly.

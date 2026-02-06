@@ -2,6 +2,7 @@
 name: "Project Task Planner"
 description: "Generates implementable tasks.yaml from specs with traceability"
 category: "planning"
+tools: Read, Write, Edit, Glob, Grep
 ---
 
 Translates `specs.md` into implementable tickets in `tasks.yaml` with `implements:` pointers. Does NOT write specs, implement code, or make architectural decisions.
