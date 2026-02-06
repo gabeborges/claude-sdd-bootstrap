@@ -10,6 +10,7 @@ Validates that implementation satisfies spec contracts and acceptance criteria; 
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - Test outputs / running app
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for checks.yaml merge-only protocol and spec-change-requests format
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/checks.yaml` (qa_validation section)

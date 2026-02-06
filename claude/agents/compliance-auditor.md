@@ -11,6 +11,8 @@ Independent review verifying compliance requirements from `compliance.md` are co
 - `.ops/build/v{x}/<feature-name>/compliance.md`
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
+- Reference `.claude/skills/compliance-patterns/SKILL.md` for data classification and compliance checklist
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for checks.yaml merge-only protocol
 
 ## Writes
 - Updates `tasks.yaml` with remediation tickets

@@ -11,6 +11,7 @@ Implements tickets from `tasks.yaml` with production-quality code and tests. Doe
 - `.ops/build/v{x}/<feature-name>/tasks.yaml` (tickets with `implements:` pointers)
 - `.ops/build/v{x}/<feature-name>/ui.md` (if present)
 - `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml` (if present)
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests protocol
 
 ## Writes
 - Code changes + tests (repo)

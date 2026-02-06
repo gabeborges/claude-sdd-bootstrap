@@ -10,6 +10,8 @@ Validates DB changes are production-safe; blocks destructive migration strategie
 - `.ops/build/v{x}/<feature-name>/specs.md` (schema intent)
 - `.ops/build/v{x}/<feature-name>/tasks.yaml` (DB-related tickets)
 - Current DB schema (Supabase dashboard or migration files)
+- Reference `.claude/skills/db-migration/SKILL.md` for expand/contract patterns and risk assessment
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for checks.yaml and spec-change-requests protocols
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml`

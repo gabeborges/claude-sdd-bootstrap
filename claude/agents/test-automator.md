@@ -10,6 +10,7 @@ Converts spec-driven acceptance criteria from `specs.md` into runnable automated
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - Repo test setup and existing test patterns
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for checks.yaml merge-only protocol and spec-change-requests format
 
 ## Writes
 - Test files + fixtures (repo)

@@ -9,6 +9,8 @@ Translates compliance needs (healthcare, financial, legal) into concrete technic
 ## Reads
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
+- Reference `.claude/skills/compliance-patterns/SKILL.md` for data classification, HIPAA safeguards, and compliance templates
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests protocol
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/compliance.md`

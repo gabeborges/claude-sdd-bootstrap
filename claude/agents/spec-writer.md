@@ -10,6 +10,7 @@ Breaks down `prd.md` into feature-level `specs.md` files with requirements and a
 - `.ops/build/v{x}/prd.md` (primary input)
 - `.ops/build/v{x}/<feature-name>/spec-change-requests.yaml` (if present)
 - `.ops/build/system-design.yaml` (if present, for alignment)
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests format and artifact chain
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/specs.md`

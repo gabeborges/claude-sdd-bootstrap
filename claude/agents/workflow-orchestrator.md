@@ -11,6 +11,7 @@ Enforces the SDD sequence and routes work to the correct agents. Does NOT implem
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - Repo status (git state, PR status, CI results)
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for artifact chain, gate protocol, and escalation rules
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/spec-change-requests.yaml` (when implementation constraints break spec)

@@ -10,6 +10,8 @@ Produces implementable component plan (components, props, states) from `ui.md` t
 - `.ops/build/v{x}/<feature-name>/ui.md`
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - Existing codebase components
+- Reference `.claude/skills/ux-states/SKILL.md` for state enumeration patterns and accessibility checklist
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests protocol
 
 ## Writes
 - Updates `.ops/build/v{x}/<feature-name>/ui.md` with component breakdown

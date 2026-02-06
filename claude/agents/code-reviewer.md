@@ -11,6 +11,7 @@ Reviews PRs as a quality gate: verifies spec compliance, acceptance criteria, se
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - PR diff
 - Repo conventions and test setup
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for checks.yaml merge-only protocol and spec-change-requests format
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/checks.yaml` (code_review section)

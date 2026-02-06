@@ -9,6 +9,7 @@ Translates `specs.md` into implementable tickets in `tasks.yaml` with `implement
 ## Reads
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/system-design.yaml` (for architectural context)
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for artifact prerequisite chain and spec-change-requests protocol
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`

@@ -9,6 +9,7 @@ Defines UX expectations (flows, screens, states, accessibility) that tasks and Q
 ## Reads
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - Existing UI patterns in the repo
+- Reference `.claude/skills/ux-states/SKILL.md` for state enumeration patterns and accessibility checklist
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/ui.md` (flows, screens, states)

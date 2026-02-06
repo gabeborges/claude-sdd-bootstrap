@@ -10,6 +10,8 @@ Investigates failures and narrows to root cause; produces concrete fix tickets (
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - Failing test logs, QA repro steps, recent code diffs
+- Reference `.claude/skills/debugging/SKILL.md` for root-cause analysis methodology and common failure patterns
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests protocol
 
 ## Writes
 - Fix tickets in `.ops/build/v{x}/<feature-name>/tasks.yaml`

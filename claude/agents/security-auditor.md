@@ -11,6 +11,8 @@ Independent security review of implementations against `security.md` patterns. C
 - `.ops/build/v{x}/<feature-name>/security.md`
 - Runtime config
 - Dependency list
+- Reference `.claude/skills/security-patterns/SKILL.md` for OWASP checklist and stack-specific security patterns
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for checks.yaml merge-only protocol
 
 ## Writes
 - Updates `tasks.yaml` with remediation tickets

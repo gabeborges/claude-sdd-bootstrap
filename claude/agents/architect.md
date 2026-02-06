@@ -10,6 +10,7 @@ Maintains `.ops/build/system-design.yaml` as the single evolving architecture re
 - `.ops/build/v{x}/prd.md` (build scope)
 - `.ops/build/v{x}/*/specs.md` (skim headings/AC only)
 - `.ops/build/system-design.yaml` (if present)
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for artifact chain and spec-change-requests format
 
 ## Writes
 - `.ops/build/system-design.yaml`

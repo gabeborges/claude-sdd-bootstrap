@@ -9,6 +9,8 @@ Defines secure implementation patterns (auth, input validation, secrets manageme
 ## Reads
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
+- Reference `.claude/skills/security-patterns/SKILL.md` for auth patterns, OWASP checklist, and threat modeling
+- Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests and checks.yaml protocols
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/security.md`
