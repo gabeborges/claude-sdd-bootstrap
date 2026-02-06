@@ -405,6 +405,10 @@ After generating the product vision document, suggest:
 3. **Start conversational exploration**:
    - "If you want to explore specific features first, try `/clavix-start:product` to have a conversation, then `/clavix-summarize:product` to refine this document"
 
+4. **Optimize for AI agents**:
+   - "Run `/vision:distill` to split this document into domain-specific files that agents load efficiently"
+   - Note: This reduces agent token load by ~60-70% — agents only read their domain slice instead of all 16 sections
+
 ---
 
 ## Error Handling
