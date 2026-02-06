@@ -181,10 +181,11 @@ All SDD artifacts live in `.ops/`:
     └── v{x}/                               # Version-scoped builds
         ├── prd.md                          # Mini-PRD for version
         ├── implementation-status.md        # Progress tracker
+        ├── db-migration-plan.yaml          # DB plan (build-level, if needed)
+        ├── build-order.yaml                # Cross-feature build order (if needed)
         └── <feature-name>/
             ├── specs.md                    # Feature requirements
-            ├── tasks.yaml                  # Implementation tasks
-            └── db-migration-plan.yaml      # DB plan (if needed)
+            └── tasks.yaml                  # Implementation tasks
 ```
 
 ---
@@ -248,7 +249,7 @@ The complete SDD artifact chain:
    - What: Architecture decisions, component design
 
 5. **Database Migration Plan** (database-administrator agent, conditional)
-   - Output: `.ops/build/v{x}/<feature>/db-migration-plan.yaml`
+   - Output: `.ops/build/v{x}/db-migration-plan.yaml` (one consolidated plan per build version)
    - Who: `database-administrator` agent
    - What: Schema changes, migration steps (only for DB-touching features)
 
@@ -257,7 +258,12 @@ The complete SDD artifact chain:
    - Who: `project-task-planner` agent
    - What: Actionable tickets with spec pointers
 
-7. **Implementation** (`/orchestrate .ops/build/v{x}/<feature-name>/`)
+7. **Build Order** (workflow-orchestrator, conditional)
+   - Output: `.ops/build/v{x}/build-order.yaml` (cross-feature execution order)
+   - Who: `workflow-orchestrator` agent
+   - What: Determines feature build sequence when there are cross-feature dependencies
+
+8. **Implementation** (`/orchestrate .ops/build/v{x}/<feature-name>/`)
    - Output: Code changes
    - Who: Development agents (coordinated by workflow-orchestrator)
    - What: The orchestrator loads specs, assigns agents by tier, runs quality gates, and produces working software
@@ -487,10 +493,11 @@ your-product-repo/
 │       └── v0/
 │           ├── prd.md
 │           ├── implementation-status.md
+│           ├── db-migration-plan.yaml
+│           ├── build-order.yaml
 │           └── feature-name/
 │               ├── specs.md
-│               ├── tasks.yaml
-│               └── db-migration-plan.yaml
+│               └── tasks.yaml
 └── app/                               # Your product code
 ```
 

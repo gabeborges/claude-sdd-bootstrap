@@ -11,6 +11,7 @@ Enforces the SDD sequence and routes work to the correct agents. Does NOT implem
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - Repo status (git state, PR status, CI results)
+- `.ops/build/v{x}/build-order.yaml` (if multi-feature build)
 - Reference `.claude/skills/sdd-protocols/SKILL.md` for artifact chain, gate protocol, and escalation rules
 
 ## Writes
@@ -71,6 +72,7 @@ Before advancing tiers:
 2. Check for `spec-change-requests.yaml` -- if found, HALT and notify user
 3. Gate agents write to `.ops/build/v{x}/<feature-name>/checks.yaml` (merge-only sections)
 4. Before T5: if `tasks.yaml` contains DB keywords (schema, migration, table, column, etc.) AND `db-migration-plan.yaml` missing → STOP, spawn database-administrator first
+5. Before starting multi-feature orchestration: validate `build-order.yaml` exists and contains all in-scope features
 
 ### Halt Protocol
 If any teammate creates `spec-change-requests.yaml`:
@@ -82,6 +84,12 @@ After each tier completes, route agent summaries to `context-manager`. If any su
 
 ### Auto-Detection
 Scan `tasks.yaml` and `specs.md` for keywords to determine which optional agents to spawn. See `.claude/agents/swarm-config.md` for the keyword table and agent roster.
+
+### Multi-Feature Protocol
+- Before orchestrating a feature, check if `.ops/build/v{x}/build-order.yaml` exists
+- If it exists, follow the layer sequence to determine which feature to orchestrate next; features in the same parallelization group may run concurrently
+- If it does not exist and multiple features are in scope, STOP and request project-task-planner to generate it
+- For single-feature builds, proceed without `build-order.yaml`
 
 ## Escalation
 - Missing `specs.md` -> STOP, request spec-writer

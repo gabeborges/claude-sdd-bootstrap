@@ -86,10 +86,10 @@ code_review:
 ### Acceptance Criteria
 - [x] Cursor pagination works
 - [x] Auth required
-- [ ] Missing rate limiting (per security.md)
+- [ ] Missing rate limiting (per security.yaml)
 
 ### Issues (must fix)
-- Rate limiting middleware not applied (required by security.md)
+- Rate limiting middleware not applied (required by security.yaml)
 
 ### Suggestions (non-blocking)
 - Consider extracting pagination logic into shared utility

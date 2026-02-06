@@ -35,6 +35,9 @@ Based on `.claude/skills/sdd-protocols/SKILL.md`, `checks.yaml` has these sectio
 | Section | Written By | Schema |
 |---------|-----------|--------|
 | `db_migration` | database-administrator | `status`, `blockers`, `notes` |
+| `ui_design` | ui-designer | `status`, `blockers`, `notes` |
+| `security_review` | security-engineer | `status`, `blockers`, `notes` |
+| `compliance_review` | compliance-engineer | `status`, `blockers`, `notes` |
 | `qa_validation` | qa | `status`, `blockers`, `notes`, `evidence` |
 | `testing` | test-automator | `status`, `blockers`, `notes`, `evidence` |
 | `code_review` | code-reviewer | `status`, `blockers`, `notes`, `evidence` |
@@ -70,6 +73,31 @@ Count:
 - Failed gates (`status: fail`)
 - Missing gates (expected section not present)
 
+### Step 3a: Check Tier 3 Artifacts and Build-Level Artifacts
+
+In addition to `checks.yaml` sections, aggregate status from these sources:
+
+1. **ui_design** — Check if `ui.md` exists in the feature workspace
+   - If present: report artifact status and check if `checks.yaml` has a `ui_design:` section
+   - If `ui.md` exists but `ui_design:` section missing from `checks.yaml`: report as INCOMPLETE
+
+2. **security_review** — Check if `security.yaml` exists in the feature workspace
+   - If present: report artifact status and check if `checks.yaml` has a `security_review:` section
+   - If `security.yaml` exists but `security_review:` section missing from `checks.yaml`: report as INCOMPLETE
+
+3. **compliance_review** — Check if `compliance.yaml` exists in the feature workspace
+   - If present: report artifact status and check if `checks.yaml` has a `compliance_review:` section
+   - If `compliance.yaml` exists but `compliance_review:` section missing from `checks.yaml`: report as INCOMPLETE
+
+4. **build_order** — Check if `build-order.yaml` exists at `.ops/build/v{x}/build-order.yaml`
+   - This is a build-level artifact (NOT per-feature)
+   - If multiple feature directories exist under `.ops/build/v{x}/` and `build-order.yaml` is missing: report as WARNING
+   - If present: report build order and feature sequencing
+
+5. **db_migration** — Reference points to build-level `.ops/build/v{x}/db-migration-plan.yaml`
+   - This is a build-level artifact (NOT per-feature)
+   - Check at `.ops/build/v{x}/db-migration-plan.yaml`, not inside the feature workspace
+
 ### Step 4: Determine Overall Verdict
 
 **Merge Ready**: All gates present and `status: pass`
@@ -95,10 +123,45 @@ Count:
 
 ### ✅ DB Migration
 **Status**: PASS
+**Source**: `.ops/build/v1/db-migration-plan.yaml` (build-level)
 **Blockers**: None
 **Notes**:
 - Expand/contract pattern applied
 - ~50k rows, backfill < 5s
+
+---
+
+### ✅ UI Design
+**Status**: PASS
+**Artifact**: `ui.md` present
+**Blockers**: None
+**Notes**:
+- Wireframes and component breakdown complete
+- Design system compliance verified
+
+---
+
+### ✅ Security Review
+**Status**: PASS
+**Artifact**: `security.yaml` present
+**Blockers**: None
+**Notes**:
+- Threat model documented
+- Auth flow reviewed
+
+---
+
+### ⬚ Compliance Review
+**Status**: NOT REQUIRED
+**Notes**:
+- No compliance keywords detected in specs/tasks
+
+---
+
+### ⬚ Build Order
+**Status**: NOT REQUIRED
+**Notes**:
+- Single feature in build version
 
 ---
 
@@ -155,7 +218,7 @@ Count:
 - Access control on /patients: met
 **Evidence**:
 - `src/routes/patients.ts`
-- `compliance.md 1.3`
+- `compliance.yaml 1.3`
 
 ---
 
@@ -253,16 +316,24 @@ Final Checklist:
 
 Expected gates (based on `.claude/skills/sdd-protocols/SKILL.md`):
 
-1. **db_migration** — required if feature touches database schema
-2. **qa_validation** — always required (contract validation)
-3. **testing** — always required (test coverage)
-4. **code_review** — always required (quality gate)
-5. **security_audit** — always required (vulnerability scan)
-6. **compliance_audit** — required if feature handles PHI/PII
+1. **db_migration** — required if feature touches database schema; references build-level `.ops/build/v{x}/db-migration-plan.yaml`
+2. **ui_design** — required if `ui.md` exists in feature workspace (UI keywords detected)
+3. **security_review** — required if `security.yaml` exists in feature workspace (security keywords detected)
+4. **compliance_review** — required if `compliance.yaml` exists in feature workspace (compliance keywords detected)
+5. **build_order** — required if build version has multiple feature directories; references build-level `.ops/build/v{x}/build-order.yaml`
+6. **qa_validation** — always required (contract validation)
+7. **testing** — always required (test coverage)
+8. **code_review** — always required (quality gate)
+9. **security_audit** — always required (vulnerability scan)
+10. **compliance_audit** — required if feature handles PHI/PII
 
 **Missing Gates Detection**:
-- If `db-migration-plan.yaml` exists but `db_migration` section missing → report as MISSING
-- If compliance.md exists but `compliance_audit` section missing → report as MISSING
+- If `.ops/build/v{x}/db-migration-plan.yaml` exists but `db_migration` section missing → report as MISSING
+- If `ui.md` exists but `ui_design` section missing from `checks.yaml` → report as MISSING
+- If `security.yaml` exists but `security_review` section missing from `checks.yaml` → report as MISSING
+- If `compliance.yaml` exists but `compliance_review` section missing from `checks.yaml` → report as MISSING
+- If `compliance.yaml` exists but `compliance_audit` section missing from `checks.yaml` → report as MISSING
+- If multiple features in build and `build-order.yaml` missing → report as WARNING
 
 ---
 
@@ -290,7 +361,9 @@ Expected gates (based on `.claude/skills/sdd-protocols/SKILL.md`):
 At the end of gate report, confirm:
 
 - [ ] Read `checks.yaml` successfully
-- [ ] Parsed all gate sections
+- [ ] Parsed all gate sections (including `ui_design`, `security_review`, `compliance_review`)
+- [ ] Checked Tier 3 artifacts (`ui.md`, `security.yaml`, `compliance.yaml`) for presence
+- [ ] Checked build-level artifacts (`db-migration-plan.yaml` at `.ops/build/v{x}/`, `build-order.yaml` at `.ops/build/v{x}/`)
 - [ ] Counted passed/failed/missing gates
 - [ ] Listed all blockers
 - [ ] Determined overall verdict

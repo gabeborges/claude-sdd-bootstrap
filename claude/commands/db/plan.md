@@ -55,9 +55,9 @@ For each migration phase, document the rollback procedure.
 
 Write the migration plan to the feature workspace:
 
-Path: `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml`
+Path: `.ops/build/v{x}/db-migration-plan.yaml` (build-level — FK ordering requires cross-feature visibility; rollback must be globally ordered)
 
-Use the schema from the db-migration skill. If no feature workspace exists, output the plan inline.
+Use the schema from the db-migration skill. If no build version workspace exists, output the plan inline.
 
 ```yaml
 db_change:

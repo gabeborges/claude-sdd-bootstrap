@@ -15,7 +15,7 @@ Defines secure implementation patterns (auth, input validation, secrets manageme
 - Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests and checks.yaml protocols
 
 ## Writes
-- `.ops/build/v{x}/<feature-name>/security.md`
+- `.ops/build/v{x}/<feature-name>/security.yaml`
 - Updates `specs.md` with security acceptance checks
 - Optional: `spec-change-requests.yaml` when security constraints require spec changes
 

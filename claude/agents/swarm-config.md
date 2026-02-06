@@ -45,6 +45,8 @@ Tier 6: qa, debugger, code-reviewer, security-auditor, compliance-auditor  (para
 
 Tier 2 is **sequential**: spec-writer must complete before architect runs, architect must complete before database-administrator runs (if needed), database-administrator must complete before project-task-planner runs. If `spec-change-requests.yaml` appears after architect, rerun spec-writer for impacted features, then rerun architect before proceeding.
 
+> The tier DAG governs **intra-feature** agent ordering (which agents run in what order for a single feature). For **inter-feature** sequencing (which feature to build first in a multi-feature build), see `.ops/build/v{x}/build-order.yaml` produced by project-task-planner.
+
 ## Auto-Detection Keywords
 
 Scan `specs.md` and `tasks.yaml` content for these keywords:
@@ -78,7 +80,8 @@ Read the following artifacts before starting:
 2. {feature-path}/specs.md — feature requirements
 3. .ops/build/system-design.yaml — architecture reference
 4. {feature-path}/tasks.yaml — feature tickets (if present)
-5. {feature-path}/db-migration-plan.yaml — DB migration plan (if feature involves DB changes)
+5. .ops/build/v{x}/db-migration-plan.yaml — DB migration plan (build-level, if DB changes involved)
+6. .ops/build/v{x}/build-order.yaml — cross-feature build order (build-level, if multi-feature build)
 
 Perform your role using these artifacts.
 Write your outputs to the feature workspace as specified in your role definition.

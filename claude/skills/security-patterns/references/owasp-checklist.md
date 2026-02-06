@@ -148,7 +148,7 @@ return <div dangerouslySetInnerHTML={{ __html: safeHTML }} />
 ### Checks
 
 - [ ] **Threat model exists** for new features (STRIDE framework)
-- [ ] **Security requirements** defined in `security.md`
+- [ ] **Security requirements** defined in `security.yaml`
 - [ ] **Attack scenarios considered** (what could go wrong?)
 - [ ] **Defense in depth** (multiple layers of security, not relying on one control)
 

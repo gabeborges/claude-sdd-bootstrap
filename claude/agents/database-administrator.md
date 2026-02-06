@@ -8,14 +8,14 @@ Validates DB changes are production-safe; blocks destructive migration strategie
 
 ## Reads
 - `.ops/tech-architecture-baseline.md` (§10: Data Principles, §14: Scalability Intent) — **RECOMMENDED**: Extract PHI minimization rules, data flow principles, and correctness-over-performance priority for migration strategy
-- `.ops/build/v{x}/<feature-name>/specs.md` (schema intent)
+- `.ops/build/v{x}/<feature-name>/specs.md` for ALL features in the build version (schema intent — FK ordering requires cross-feature visibility)
 - `.ops/build/system-design.yaml` (`data.entities`, `data.key_constraints`) — architect's canonical data model
 - Current DB schema (Supabase dashboard or migration files)
 - Reference `.claude/skills/db-migration/SKILL.md` for expand/contract patterns and risk assessment
 - Reference `.claude/skills/sdd-protocols/SKILL.md` for checks.yaml and spec-change-requests protocols
 
 ## Writes
-- `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml`
+- `.ops/build/v{x}/db-migration-plan.yaml` (build-level — FK ordering requires cross-feature visibility; rollback must be globally ordered)
 - `.ops/build/v{x}/<feature-name>/checks.yaml` (merge-only, `db_migration` section)
 
 ## Rules
@@ -34,10 +34,10 @@ Validates DB changes are production-safe; blocks destructive migration strategie
 
 ## Process
 1. Read `system-design.yaml` data model (`data.entities`, `data.key_constraints`) for architect's canonical schema decisions
-2. Read `specs.md` for schema intent and requirements
-3. For each schema change, produce an expand/contract/rollback plan
+2. Read ALL features' `specs.md` under `.ops/build/v{x}/` for schema intent and requirements (FK ordering requires cross-feature visibility)
+3. For each schema change across all features, produce a unified expand/contract/rollback plan with globally ordered migrations
 4. Assess risk level and data volume impact
-5. Write `db-migration-plan.yaml`
+5. Write `db-migration-plan.yaml` to `.ops/build/v{x}/db-migration-plan.yaml`
 6. Update `checks.yaml` with `db_migration` gate result
 
 ## Output Format

@@ -74,6 +74,32 @@ Check for presence and staleness of each artifact:
    - Complete? All tasks have `implements:` pointers
    - Stale? Check if modified date is older than `specs.md` or `system-design.yaml`
 
+5. **ui.md** (Tier 3, conditional) — `.ops/build/v{x}/<feature-name>/ui.md`
+   - Required if: `specs.md` or `tasks.yaml` contains UI auto-detection keywords (`ui`, `screen`, `flow`, `component`, `view`, `page`, `layout`, `modal`, `form`, `button`, `navigation`, `responsive`, `wireframe`)
+   - Present? Yes/No/Not Required
+   - If required but missing: report as INCOMPLETE for Tier 3
+
+6. **security.yaml** (Tier 3, conditional) — `.ops/build/v{x}/<feature-name>/security.yaml`
+   - Required if: `specs.md` or `tasks.yaml` contains security auto-detection keywords (`auth`, `secret`, `token`, `credential`, `oauth`, `jwt`, `session`, `permission`, `rbac`, `acl`, `encryption`, `api key`, `password`, `mfa`, `2fa`)
+   - Present? Yes/No/Not Required
+   - If required but missing: report as INCOMPLETE for Tier 3
+
+7. **compliance.yaml** (Tier 3, conditional) — `.ops/build/v{x}/<feature-name>/compliance.yaml`
+   - Required if: `specs.md` or `tasks.yaml` contains compliance auto-detection keywords (`phi`, `pii`, `hipaa`, `phipaa`, `pipeda`, `compliance`, `audit trail`, `data retention`, `baa`, `encryption at rest`, `de-identification`, `access log`, `consent`, `gdpr`)
+   - Present? Yes/No/Not Required
+   - If required but missing: report as INCOMPLETE for Tier 3
+
+8. **db-migration-plan.yaml** (build-level) — `.ops/build/v{x}/db-migration-plan.yaml`
+   - Note: This is a build-level artifact, NOT per-feature
+   - Required if: `specs.md` or `tasks.yaml` contains database auto-detection keywords (`schema`, `migration`, `table`, `column`, `index`, `database`, `db`, `foreign key`, `sql`, `relation`, `constraint`, `seed`, `backfill`)
+   - Present? Yes/No/Not Required
+
+9. **build-order.yaml** (build-level) — `.ops/build/v{x}/build-order.yaml`
+   - Note: This is a build-level artifact, NOT per-feature
+   - Required if: build version `v{x}` contains multiple feature directories
+   - Check: List feature directories under `.ops/build/v{x}/`; if more than one exists, `build-order.yaml` is required
+   - Present? Yes/No/Not Required
+
 ### Step 3: Check for Blockers
 
 Check for blocking conditions:
@@ -86,7 +112,31 @@ Check for blocking conditions:
    - If exists, check each section for `status: fail`
    - List failing gates
 
-### Step 4: Determine Readiness Tier
+### Step 4: Check for Orphan Files
+
+Check the feature workspace for non-canonical files. The approved file list for a feature workspace is:
+
+**Canonical files** (per-feature):
+- `specs.md`
+- `tasks.yaml`
+- `ui.md`
+- `security.yaml`
+- `compliance.yaml`
+- `checks.yaml`
+- `spec-change-requests.yaml`
+
+**Check**:
+1. List all files in `.ops/build/v{x}/<feature-name>/`
+2. Compare against the canonical list above
+3. If any file exists that is NOT in the canonical list, emit a warning:
+   ```
+   WARNING: Non-canonical file(s) found in feature workspace:
+   - <filename>
+   Recommendation: Move to appropriate location or remove if not needed
+   ```
+4. Orphan files do NOT block tier progression — this is a warning only
+
+### Step 5: Determine Readiness Tier
 
 Based on artifact presence:
 
@@ -101,10 +151,16 @@ Based on artifact presence:
 - All Tier 2 artifacts exist
 - `specs.md`, `system-design.yaml`, `tasks.yaml` all present
 - Ready for: ui-designer, security-engineer, compliance-engineer
+- Auto-detection: scan `specs.md` and `tasks.yaml` for keywords (see swarm-config.md)
 
 **Tier 4 Ready** (Implementation prep)
 - All Tier 2 artifacts exist
-- Tier 3 outputs present (if agents were triggered)
+- Tier 3 outputs present (if agents were triggered):
+  - `ui.md` present if UI keywords detected
+  - `security.yaml` present if security keywords detected
+  - `compliance.yaml` present if compliance keywords detected
+- Build-level: `db-migration-plan.yaml` present at `.ops/build/v{x}/db-migration-plan.yaml` (if DB keywords detected)
+- Build-level: `build-order.yaml` present at `.ops/build/v{x}/build-order.yaml` (if multiple features in build)
 - Ready for: frontend-designer, database-administrator
 
 **Tier 5 Ready** (Implementation)
@@ -142,6 +198,11 @@ Based on artifact presence:
 | `specs.md` | ✅ Present | 2026-02-02 | Complete, all sections present |
 | `system-design.yaml` | ✅ Present | 2026-02-02 | In sync with specs |
 | `tasks.yaml` | ✅ Present | 2026-02-03 | 10 tasks, all have `implements:` pointers |
+| `ui.md` | ✅ Present | 2026-02-03 | Required (UI keywords detected) |
+| `security.yaml` | ✅ Present | 2026-02-03 | Required (security keywords detected) |
+| `compliance.yaml` | ⬚ Not Required | - | No compliance keywords detected |
+| `db-migration-plan.yaml` | ✅ Present (build-level) | 2026-02-02 | `.ops/build/v1/db-migration-plan.yaml` |
+| `build-order.yaml` | ⬚ Not Required | - | Single feature in build |
 | `checks.yaml` | ⚠️ Present | 2026-02-04 | 2 failing gates (see Blockers) |
 
 ---
@@ -246,6 +307,10 @@ Cannot proceed until requests are resolved by spec-writer
 At the end of gate check, confirm:
 
 - [ ] Read all expected artifacts
+- [ ] Ran auto-detection keyword scan on `specs.md` and `tasks.yaml` for Tier 3 requirements
+- [ ] Checked Tier 3 conditional outputs (`ui.md`, `security.yaml`, `compliance.yaml`)
+- [ ] Checked build-level artifacts (`db-migration-plan.yaml`, `build-order.yaml`)
+- [ ] Checked for orphan files in feature workspace
 - [ ] Checked for blockers (spec-change-requests, failing gates)
 - [ ] Determined current tier
 - [ ] Identified next tier blockers

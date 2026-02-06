@@ -75,9 +75,10 @@ npm run build
 - Do not mix build versions (`v0`, `v1`, `v2`) in a single change or commit
 
 ## SDD Artifact Flow
-- Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) → `db-migration-plan.yaml` (database-administrator, conditional) → `tasks.yaml` (project-task-planner)
+- Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) → `db-migration-plan.yaml` (build-level, conditional) → `tasks.yaml` (per feature) → `build-order.yaml` (cross-feature, conditional)
 - Do not create `tasks.yaml` until `system-design.yaml` exists
-- Do not create `db-migration-plan.yaml` until `system-design.yaml` exists (for DB-touching features only)
+- Do not create `db-migration-plan.yaml` until `system-design.yaml` exists — one consolidated plan per build version at `.ops/build/v{x}/db-migration-plan.yaml`
+- Do not create `build-order.yaml` until all feature `tasks.yaml` files exist for the build version
 
 ## Token/Context Rules
 - Default to feature-scoped reads only

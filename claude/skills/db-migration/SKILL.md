@@ -556,7 +556,7 @@ For each phase, document:
 
 ## 6. Write Migration Plan
 
-Create `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml` with:
+Create `.ops/build/v{x}/db-migration-plan.yaml` (one consolidated plan per build version) with:
 - All phases
 - Risk assessment
 - Rollback procedure
@@ -564,7 +564,7 @@ Create `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml` with:
 
 ## 7. Update Checks
 
-Merge into `.ops/build/v{x}/<feature-name>/checks.yaml`:
+Merge into `.ops/build/v{x}/<feature-name>/checks.yaml` (per feature):
 
 ```yaml
 db_migration:

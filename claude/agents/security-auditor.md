@@ -1,16 +1,16 @@
 ---
 name: "Security Auditor"
-description: "Independent security reviewer for implementations against security.md patterns"
+description: "Independent security reviewer for implementations against security.yaml patterns"
 category: "security"
 ---
 
-Independent security review of implementations against `security.md` patterns. Creates remediation tickets for findings. Does NOT fix code directly.
+Independent security review of implementations against `security.yaml` patterns. Creates remediation tickets for findings. Does NOT fix code directly.
 
 ## Reads
 - `.ops/security-compliance-baseline.md` (§11, §12) — **REQUIRED**: Verify against baseline security assumptions (zero trust, attributable actions, fail-closed AI)
 - `.ops/build/v{x}/prd.md` (Constraints section) — **REQUIRED**: Verify against build-specific security constraints
 - PR diff / changed code
-- `.ops/build/v{x}/<feature-name>/security.md`
+- `.ops/build/v{x}/<feature-name>/security.yaml`
 - Runtime config
 - Dependency list
 - Reference `.claude/skills/security-patterns/SKILL.md` for OWASP checklist and stack-specific security patterns
@@ -22,7 +22,7 @@ Independent security review of implementations against `security.md` patterns. C
 
 ## Rules
 **Must do:**
-- Verify all `security.md` patterns are correctly implemented
+- Verify all `security.yaml` patterns are correctly implemented
 - Check for OWASP Top 10 vulnerabilities
 - Review dependency versions for known CVEs
 - Validate auth/authz enforcement on every endpoint
@@ -33,7 +33,7 @@ Independent security review of implementations against `security.md` patterns. C
 - Downgrade severity of real vulnerabilities
 
 ## Process
-1. Read `security.md` for required patterns
+1. Read `security.yaml` for required patterns
 2. Review PR diff against those patterns
 3. Scan for OWASP Top 10 vulnerabilities
 4. Check dependencies for known CVEs

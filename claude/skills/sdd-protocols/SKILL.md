@@ -11,17 +11,21 @@ Reference for SDD workflow protocols. Load this when you need to understand arti
 
 ## 1. Artifact Prerequisite Chain
 
-Canonical order: `prd.md` → `specs.md` → `system-design.yaml` → `tasks.yaml`
+Canonical order: `prd.md` → `specs.md` → `system-design.yaml` → `db-migration-plan.yaml` (build-level, conditional) → `tasks.yaml` (per feature) → `build-order.yaml` (cross-feature, conditional)
 
 | Artifact | Prerequisite | On Violation |
 |---|---|---|
 | `specs.md` | `prd.md` must exist for that version | STOP — ask user |
 | `system-design.yaml` | `specs.md` must exist for that feature | STOP — run spec-writer first |
+| `db-migration-plan.yaml` | `system-design.yaml` must exist (DB-touching features only) | STOP — run architect first |
 | `tasks.yaml` | Both `specs.md` AND `system-design.yaml` must exist | STOP — run architect first |
+| `build-order.yaml` | All feature `tasks.yaml` files must exist | STOP — run project-task-planner first |
 
 **Rules:**
 - Do not create `tasks.yaml` until `system-design.yaml` exists
 - Do not create `system-design.yaml` until `specs.md` exists
+- Do not create `db-migration-plan.yaml` until `system-design.yaml` exists (consolidated per build version, not per feature)
+- Do not create `build-order.yaml` until all feature `tasks.yaml` files exist for the build version
 - `specs.md` is authoritative — code must align with it, not the other way around
 - All `implements:` pointers in `tasks.yaml` must reference nodes defined in `specs.md`
 
@@ -182,7 +186,7 @@ code_review:
 code_review:
   status: fail
   blockers:
-    - "Rate limiting middleware not applied (required by security.md)"
+    - "Rate limiting middleware not applied (required by security.yaml)"
   notes:
     - "Response matches UserList schema"
     - "Cursor pagination works"
@@ -250,13 +254,13 @@ compliance_audit:
     - "Access control on /patients: met"
   evidence:
     - "src/routes/patients.ts"
-    - "compliance.md 1.3"
+    - "compliance.yaml 1.3"
 ```
 
 **Findings Template (for notes/blockers):**
 ```markdown
 CRITICAL|HIGH|MEDIUM: {finding title}
-- Requirement: {compliance.md reference}
+- Requirement: {compliance.yaml reference}
 - Location: {file:line}
 - Issue: {description}
 - Remediation: {required fix}
@@ -281,8 +285,8 @@ If `status: fail`, agent MUST:
 ### When to STOP (Immediate Halt)
 - **Prerequisite missing**: artifact chain violated (see section 1)
 - **Ambiguous spec**: information needed to write correct acceptance criteria
-- **Security conflict**: spec contradicts security.md or OWASP patterns
-- **Compliance conflict**: spec contradicts compliance.md requirements
+- **Security conflict**: spec contradicts security.yaml or OWASP patterns
+- **Compliance conflict**: spec contradicts compliance.yaml requirements
 - **Destructive DB operation**: no rollback plan or backfill verification
 - **spec-change-requests.yaml exists** with `status: open`
 
@@ -305,7 +309,7 @@ If `status: fail`, agent MUST:
 
 ### When to Proceed (No Escalation)
 - Spec is clear and complete
-- No conflicts with security.md, compliance.md, or system-design.yaml
+- No conflicts with security.yaml, compliance.yaml, or system-design.yaml
 - DB changes follow expand/contract pattern with rollback
 - All gates pass (`checks.yaml` sections show `status: pass`)
 - No open `spec-change-requests.yaml` entries
@@ -400,15 +404,18 @@ In `tasks.yaml`:
 - Tasks: `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - Gates: `.ops/build/v{x}/<feature-name>/checks.yaml`
 - Escalations: `.ops/build/v{x}/<feature-name>/spec-change-requests.yaml`
-- DB Plans: `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml`
+- DB Plans: `.ops/build/v{x}/db-migration-plan.yaml` (one consolidated plan per build version)
+- Build Order: `.ops/build/v{x}/build-order.yaml` (cross-feature, conditional)
 
 ### Agent Flow
 1. spec-writer → `specs.md`
 2. architect → `system-design.yaml`
-3. project-task-planner → `tasks.yaml`
-4. Conditional agents (ui-designer, security-engineer, compliance-engineer, database-administrator)
-5. fullstack-developer + test-automator → code + tests
-6. qa + code-reviewer + security-auditor + compliance-auditor → `checks.yaml`
+3. database-administrator → `db-migration-plan.yaml` (build-level, conditional)
+4. project-task-planner → `tasks.yaml`
+5. Conditional agents (ui-designer, security-engineer, compliance-engineer)
+6. workflow-orchestrator → `build-order.yaml` (cross-feature, conditional)
+7. fullstack-developer + test-automator → code + tests
+8. qa + code-reviewer + security-auditor + compliance-auditor → `checks.yaml`
 
 ### Stop Signals
 - `spec-change-requests.yaml` exists with `status: open`

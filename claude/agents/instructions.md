@@ -21,14 +21,15 @@ Canonical flow: spec → system design → db migration planning (if DB changes)
 
 ### SDD Artifact Flow (Prerequisite Rules)
 
-Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) → `db-migration-plan.yaml` (database-administrator, if DB changes) → `tasks.yaml` (project-task-planner)
+Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) → `db-migration-plan.yaml` (database-administrator, build-level, if DB changes) → `tasks.yaml` (project-task-planner, per feature) → `build-order.yaml` (project-task-planner, build-level, if multi-feature)
 
 | Artifact | Prerequisite | On Violation |
 |---|---|---|
 | `specs.md` | `prd.md` must exist for that version | STOP — ask user |
 | `system-design.yaml` | `specs.md` must exist for that feature | STOP — run spec-writer first |
-| `db-migration-plan.yaml` | `system-design.yaml` complete AND specs contain DB keywords | STOP — run architect first |
+| `db-migration-plan.yaml` | `system-design.yaml` complete AND any feature's specs contain DB keywords (build-level, not per-feature) | STOP — run architect first |
 | `tasks.yaml` | Both `specs.md` AND `system-design.yaml` must exist | STOP — run architect first |
+| `build-order.yaml` | All features' `tasks.yaml` must exist | STOP — run project-task-planner for remaining features |
 
 ---
 
@@ -91,17 +92,17 @@ The canonical agent roster lives in **AGENTS.md**. This table adds Inputs/Output
 | spec-writer | Spec authoring + feature breakdown | `prd.md`, product context | `specs.md` (feature requirements + acceptance criteria) |
 | architect | System design maintainer | `specs.md`, existing `system-design.yaml` | `.ops/build/system-design.yaml`; creates `spec-change-requests.yaml` if spec/architecture mismatch found |
 | project-task-planner | Spec handoff / ticket writer | `specs.md`, `system-design.yaml`, `db-migration-plan.yaml` (if present), existing `.ops/build/decisions-log.md` | `tasks.yaml` (tickets with `implements:` pointers) |
-| ui-designer | UX intent + flows | `specs.md`, `tasks.yaml` scope, existing UI patterns, `.ops/ui-design-system.md` | UX flows, screens, states, accessibility notes |
-| frontend-designer | Design-to-implementation translator | UI specs, codebase components, `tasks.yaml` | Component breakdown (components/props/states) |
+| ui-designer | UX intent + flows | `specs.md`, `tasks.yaml` scope, existing UI patterns, `.ops/ui-design-system.md` | `.ops/build/v{x}/<feature>/ui.md`; updates `specs.md` with UX acceptance checks |
+| frontend-designer | Design-to-implementation translator | UI specs, codebase components, `tasks.yaml` | Updates `.ops/build/v{x}/<feature>/ui.md` with component breakdown |
 | fullstack-developer | Primary builder | `tasks.yaml`, `specs.md`, UI specs, `db-migration-plan.yaml` (if any), repo code | Code changes + tests |
-| database-administrator | Migration strategist / safety gate | `specs.md` schema intent, `system-design.yaml` (`data.entities`, `data.key_constraints`), current DB schema | `db-migration-plan.yaml` (expand/contract/backfill/rollback) |
+| database-administrator | Migration strategist / safety gate | `specs.md` schema intent, `system-design.yaml` (`data.entities`, `data.key_constraints`), current DB schema | `.ops/build/v{x}/db-migration-plan.yaml` (build-level, consolidated) |
 | qa | Contract validation + exploratory | `specs.md` (`implements:` pointers), `tasks.yaml`, running app/test outputs | Validation results; may open issues in `tasks.yaml` |
 | test-automator | Automated test implementer | `specs.md`, `tasks.yaml`, repo test setup | Test files + fixtures |
 | debugger | Root-cause investigator | Failing test logs, QA repro steps, recent diffs | Fix tickets in `tasks.yaml` |
 | code-reviewer | Quality gate | PR diff, `tasks.yaml`, `specs.md` | Review notes; may add required-fix tasks to `tasks.yaml` |
-| security-engineer | Secure-by-design implementer | `tasks.yaml`, auth model, infra context | Security patterns/decisions; updates `specs.md` with security checks |
+| security-engineer | Secure-by-design implementer | `tasks.yaml`, auth model, infra context | `.ops/build/v{x}/<feature>/security.yaml`; updates `specs.md` with security checks |
 | security-auditor | Independent security reviewer | PR diff, runtime config, dependency list | Findings list; remediation tasks in `tasks.yaml` |
-| compliance-engineer | Compliance-by-design | `tasks.yaml`, `specs.md`, data flows/PHI assumptions | Compliance requirements; updates `specs.md` with compliance checks |
+| compliance-engineer | Compliance-by-design | `tasks.yaml`, `specs.md`, data flows/PHI assumptions | `.ops/build/v{x}/<feature>/compliance.yaml`; updates `specs.md` with compliance checks |
 | compliance-auditor | Independent compliance reviewer | PR diff, logs/audit trails, data handling | Findings list; remediation tasks in `tasks.yaml` |
 
 ---
@@ -123,10 +124,16 @@ Per AGENTS.md:
     └── v{x}/
         ├── prd.md
         ├── implementation-status.md
+        ├── db-migration-plan.yaml
+        ├── build-order.yaml (conditional — multi-feature builds)
         └── <feature-name>/
             ├── specs.md
             ├── tasks.yaml
-            └── (optional) checks.yaml, db-migration-plan.yaml, spec-change-requests.yaml
+            ├── ui.md (conditional — features with UI)
+            ├── security.yaml (conditional — security-sensitive features)
+            ├── compliance.yaml (conditional — compliance-sensitive features)
+            ├── checks.yaml
+            └── spec-change-requests.yaml (optional)
 ```
 
 ### Gate Output

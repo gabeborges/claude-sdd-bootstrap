@@ -15,7 +15,7 @@ Translates compliance needs (healthcare, financial, legal) into concrete technic
 - Reference `.claude/skills/sdd-protocols/SKILL.md` for spec-change-requests protocol
 
 ## Writes
-- `.ops/build/v{x}/<feature-name>/compliance.md`
+- `.ops/build/v{x}/<feature-name>/compliance.yaml`
 - Updates `specs.md` with compliance acceptance checks
 - Optional: `spec-change-requests.yaml` when compliance constraints require spec changes
 

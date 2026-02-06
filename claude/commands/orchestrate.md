@@ -98,7 +98,7 @@ Before advancing tiers:
 - If `system-design.yaml` missing → STOP, output: "Cannot create tasks.yaml — system-design.yaml prerequisite missing"
 
 **Gate: Before T5 (implementation):**
-- If `tasks.yaml` contains DB keywords (schema, migration, table, column, etc.) AND `$ARGUMENTS/db-migration-plan.yaml` missing → STOP, output: "DB changes detected in tasks but no migration plan — spawn database-administrator first"
+- If `tasks.yaml` contains DB keywords (schema, migration, table, column, etc.) AND `.ops/build/v{x}/db-migration-plan.yaml` missing → STOP, output: "DB changes detected in tasks but no migration plan — spawn database-administrator first"
 
 ### 6. Halt Protocol
 

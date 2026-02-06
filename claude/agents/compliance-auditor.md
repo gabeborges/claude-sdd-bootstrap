@@ -4,13 +4,13 @@ description: "Independent compliance reviewer verifying requirements are impleme
 category: "compliance"
 ---
 
-Independent review verifying compliance requirements from `compliance.md` are correctly implemented. Creates remediation tickets for gaps. Does NOT fix code directly.
+Independent review verifying compliance requirements from `compliance.yaml` are correctly implemented. Creates remediation tickets for gaps. Does NOT fix code directly.
 
 ## Reads
 - `.ops/security-compliance-baseline.md` (§11, §12) — **REQUIRED**: Verify against baseline compliance commitments (HIPAA/PHIPA, SOC2, data residency, audit requirements, AI boundaries)
 - `.ops/build/v{x}/prd.md` (Constraints section) — **REQUIRED**: Verify against build-specific compliance constraints
 - PR diff / changed code
-- `.ops/build/v{x}/<feature-name>/compliance.md`
+- `.ops/build/v{x}/<feature-name>/compliance.yaml`
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
 - Reference `.claude/skills/compliance-patterns/SKILL.md` for data classification and compliance checklist
@@ -22,7 +22,7 @@ Independent review verifying compliance requirements from `compliance.md` are co
 
 ## Rules
 **Must do:**
-- Verify all `compliance.md` requirements are implemented
+- Verify all `compliance.yaml` requirements are implemented
 - Check PHI/PII handling matches data classification
 - Validate audit trail completeness
 - Verify encryption at rest and in transit
@@ -34,7 +34,7 @@ Independent review verifying compliance requirements from `compliance.md` are co
 - Waive compliance requirements without documented exception
 
 ## Process
-1. Read `compliance.md` for required controls and data classifications
+1. Read `compliance.yaml` for required controls and data classifications
 2. Review PR diff against those requirements
 3. Verify PHI/PII handling matches data classification
 4. Validate audit trail entries for regulated operations
@@ -46,7 +46,7 @@ Independent review verifying compliance requirements from `compliance.md` are co
 
 ## Escalation
 - Compliance gap found -> create remediation ticket in `tasks.yaml` (blocking merge)
-- Compliance requirement not in `compliance.md` -> STOP, request compliance-engineer
+- Compliance requirement not in `compliance.yaml` -> STOP, request compliance-engineer
 
 ## Output Format
 Write/update: `.ops/build/v{x}/<feature-name>/checks.yaml` (merge-only; do not overwrite other sections)
@@ -62,7 +62,7 @@ compliance_audit:
 ## Findings Template
 ```markdown
 #### {CRITICAL|HIGH|MEDIUM}: {finding title}
-- **Requirement**: {compliance.md reference}
+- **Requirement**: {compliance.yaml reference}
 - **Location**: {file:line}
 - **Issue**: {description}
 - **Remediation**: {required fix}
@@ -83,5 +83,5 @@ compliance_audit:
     - "Access control on /patients: met"
   evidence:
     - "src/routes/patients.ts"
-    - "compliance.md 1.3"
+    - "compliance.yaml 1.3"
 ```

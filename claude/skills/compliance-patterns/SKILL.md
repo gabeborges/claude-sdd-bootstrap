@@ -138,7 +138,7 @@ Systematic approach to translating compliance requirements (HIPAA, GDPR, SOC2, f
 
 # Compliance.md Template
 
-Every feature handling regulated data must have a `compliance.md` file.
+Every feature handling regulated data must have a `compliance.yaml` file.
 
 ```markdown
 # Compliance: {Feature Name}
@@ -465,19 +465,19 @@ on_export_request:
 **Compliance Engineer workflow:**
 1. Read `specs.md` and `tasks.yaml`
 2. Identify all PHI/PII data flows
-3. Create `compliance.md` with controls and acceptance checks
+3. Create `compliance.yaml` with controls and acceptance checks
 4. Update `specs.md` with compliance acceptance checks
 5. If specs conflict with compliance, create `spec-change-requests.yaml` and stop
 
 **Compliance Auditor workflow:**
-1. Read `compliance.md` for required controls
+1. Read `compliance.yaml` for required controls
 2. Review PR diff against compliance requirements
 3. Verify PHI/PII handling, encryption, audit logging, access control
 4. Create remediation tickets in `tasks.yaml` for gaps
 5. Write verdict to `checks.yaml` (blocking if non-compliant)
 
 **Developer workflow:**
-1. Read `compliance.md` before implementing feature
+1. Read `compliance.yaml` before implementing feature
 2. Implement required technical controls
 3. Add tests for compliance checks
 4. Never log PHI/PII content
@@ -489,7 +489,7 @@ on_export_request:
 
 **Scenario:** Building a feature to create, view, and update patient medical records
 
-**compliance.md output:**
+**compliance.yaml output:**
 
 ```markdown
 # Compliance: Patient Medical Records
@@ -603,4 +603,4 @@ Feature allows healthcare providers to create, view, and update patient medical 
 
 - `/compliance-patterns:classify` — Classify data fields as PHI/PII/public
 - `/compliance-patterns:audit-check` — Generate compliance audit checklist
-- `/compliance-patterns:template` — Create compliance.md from template
+- `/compliance-patterns:template` — Create compliance.yaml from template

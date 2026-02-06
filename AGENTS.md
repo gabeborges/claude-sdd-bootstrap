@@ -19,6 +19,8 @@ Agents MUST consult these artifacts before coding:
 | 4 | PRD | `.ops/build/v{x}/prd.md` | Version scope + acceptance intent |
 | 5 | Specs | `.ops/build/v{x}/<feature-name>/specs.md` | Requirements + acceptance criteria (source of truth) |
 | 6 | Tasks | `.ops/build/v{x}/<feature-name>/tasks.yaml` | Feature tickets with `implements:` pointers into specs |
+| 7 | DB Migration Plan | `.ops/build/v{x}/db-migration-plan.yaml` | Build-level consolidated migration plan |
+| 8 | Build Order | `.ops/build/v{x}/build-order.yaml` | Cross-feature execution ordering |
 
 **Do not proceed with coding if any required artifact is missing or ambiguous. Ask questions.**
 
@@ -28,6 +30,8 @@ Agents MUST consult these artifacts before coding:
 - `implementation-status.md` = build level progress tracker in `.ops/build/v{x}/implementation-status.md`
 - `specs.md` = feature requirements + acceptance criteria in `.ops/build/v{x}/<feature-name>/specs.md`
 - `tasks.yaml` = feature tickets in `.ops/build/v{x}/<feature-name>/tasks.yaml`
+- `db-migration-plan.yaml` = build-level consolidated migration plan in `.ops/build/v{x}/db-migration-plan.yaml`
+- `build-order.yaml` = cross-feature execution ordering in `.ops/build/v{x}/build-order.yaml`
 
 ### Folder Structure
 ```
@@ -43,17 +47,22 @@ Agents MUST consult these artifacts before coding:
     └── v{x}/
         ├── prd.md
         ├── implementation-status.md
+        ├── db-migration-plan.yaml
+        ├── build-order.yaml (conditional — multi-feature builds)
         └── <feature-name>/
             ├── specs.md
             ├── tasks.yaml
-            ├── db-migration-plan.yaml (conditional — required if DB changes detected)
-            └── (optional) checks.yaml, spec-change-requests.yaml
+            ├── ui.md (conditional — features with UI)
+            ├── security.yaml (conditional — security-sensitive features)
+            ├── compliance.yaml (conditional — compliance-sensitive features)
+            ├── checks.yaml
+            └── spec-change-requests.yaml (optional)
 ```
 
 ## Workflow Discipline
 
 ### SDD Artifact Flow
-Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) → `db-migration-plan.yaml` (database-administrator, if DB changes) → `tasks.yaml` (project-task-planner)
+Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) → `db-migration-plan.yaml` (database-administrator, build-level, if DB changes) → `tasks.yaml` (project-task-planner, per feature) → `build-order.yaml` (project-task-planner, cross-feature)
 
 **Prerequisite rules (stop conditions):**
 
@@ -61,8 +70,9 @@ Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) �
 |---|---|---|
 | `specs.md` | `prd.md` must exist for that version | STOP — ask user |
 | `system-design.yaml` | `specs.md` must exist for that feature | STOP — run spec-writer first |
-| `db-migration-plan.yaml` | `system-design.yaml` complete AND specs contain DB keywords | STOP — run architect first |
+| `db-migration-plan.yaml` | `system-design.yaml` complete AND specs contain DB keywords (build-level) | STOP — run architect first |
 | `tasks.yaml` | Both `specs.md` AND `system-design.yaml` must exist | STOP — run architect first |
+| `build-order.yaml` | All features' `tasks.yaml` must exist | STOP — run project-task-planner for remaining features |
 
 ### Spec vs Implementation
 - Write `specs.md` and `implementation-status.md` only in the proposal phase

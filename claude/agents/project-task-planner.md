@@ -10,11 +10,12 @@ Translates `specs.md` into implementable tickets in `tasks.yaml` with `implement
 - `.ops/build/v{x}/prd.md` (build scope, constraints) — **RECOMMENDED**: Extract build-level context (success metrics, integration points, constraints) for task planning
 - `.ops/build/v{x}/<feature-name>/specs.md`
 - `.ops/build/system-design.yaml` (for architectural context)
-- `.ops/build/v{x}/<feature-name>/db-migration-plan.yaml` (if present — for migration-aware task breakdown)
+- `.ops/build/v{x}/db-migration-plan.yaml` (if present — build-level, for migration-aware task breakdown)
 - Reference `.claude/skills/sdd-protocols/SKILL.md` for artifact prerequisite chain and spec-change-requests protocol
 
 ## Writes
 - `.ops/build/v{x}/<feature-name>/tasks.yaml`
+- `.ops/build/v{x}/build-order.yaml` (build-level, conditional — multi-feature builds only)
 
 ## Rules
 **Must do**:
@@ -22,6 +23,7 @@ Translates `specs.md` into implementable tickets in `tasks.yaml` with `implement
 - Ensure full spec coverage (every spec node has at least one task)
 - Write tasks at implementable granularity (one clear deliverable per task, fits in one PR)
 - Note dependencies between tasks
+- Cross-feature `depends_on` references in `tasks.yaml` must use valid task IDs from other features' `tasks.yaml`
 
 **Must NOT do**:
 - Create tasks that don't trace to a spec node
@@ -39,6 +41,7 @@ If `.ops/build/system-design.yaml` does not exist or was not updated after the l
 4. Note inter-task dependencies
 5. If `db-migration-plan.yaml` exists, create tickets for each migration phase (expand, migrate, contract)
 6. Output `tasks.yaml`
+7. After generating `tasks.yaml` for ALL features in the build, if multiple features exist, produce `.ops/build/v{x}/build-order.yaml` by consolidating cross-feature `depends_on` references into layers with parallelization groups
 
 ## Scope
 - Generates/updates `tasks.yaml` for a feature based on `specs.md`
