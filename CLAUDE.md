@@ -81,5 +81,5 @@ npm run build
 ## Token/Context Rules
 - Default to feature-scoped reads only
 - Do NOT read `.ops/product-vision-strategy.md` or `.ops/ui-design-system.md` unless needed
-- `.ops/build/system-design.yaml` is the architecture reference — load only for architecture decisions or `spec_change_requests`
+- `.ops/build/system-design.yaml` is the architecture reference — load only for architecture decisions or `spec-change-requests.yaml`
 - Gate results go to checks.yaml; keep outputs short

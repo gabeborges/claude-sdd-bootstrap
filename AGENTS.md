@@ -97,8 +97,7 @@ When finishing work, report:
 | Agent | Role | Category | File |
 |-------|------|----------|------|
 | Workflow Orchestrator | Orchestration + routing | orchestration | `.claude/agents/workflow-orchestrator.md` |
-| Context Manager | Memory + decision log | orchestration | `.claude/agents/context-manager.md` |
-| Knowledge Synthesizer | Deviation logger + build knowledge compactor | orchestration | `.claude/agents/knowledge-synthesizer.md` |
+| Context Manager | Decision log + deviation logger (sole writer) | orchestration | `.claude/agents/context-manager.md` |
 | Spec Writer | Spec authoring + feature breakdown | planning | `.claude/agents/spec-writer.md` |
 | Architect | System design maintainer | planning | `.claude/agents/architect.md` |
 | Project Task Planner | Spec handoff / ticket writer | planning | `.claude/agents/project-task-planner.md` |
@@ -119,8 +118,7 @@ When finishing work, report:
 
 ### Orchestration
 - **Workflow Orchestrator** — Enforces SDD sequence, triggers agents, routes spec breaks
-- **Context Manager** — Append-only decision log, resumable state
-- **Knowledge Synthesizer** — Deviation logger + build knowledge compactor
+- **Context Manager** — Sole writer to decisions-log.md and implementation-status.md; records decisions, state changes, deviations
 
 ### Planning
 - **Spec Writer** — Spec authoring + feature breakdown

@@ -8,8 +8,7 @@ Reference for `/orchestrate` slash command. Maps SDD agents to Task tool teammat
 
 | Agent | subagent_type | Tier | Auto-detect trigger | Persistent? |
 |---|---|---|---|---|
-| context-manager | general-purpose | 1 | Always | Yes |
-| knowledge-synthesizer | general-purpose | 1 | Always (also triggered on: deviation, scope change, spec break, changed plan, trade-off, constraint) | No |
+| context-manager | general-purpose | 1 | Always (also triggered per-tier on: deviation, scope change, spec break, changed plan, trade-off, constraint, spec-change-request, blocked, architecture decision, migration, security finding, compliance finding) | Yes |
 | spec-writer | general-purpose | 2 | `{feature-path}/specs.md` missing OR empty OR `{feature-path}/spec-change-requests.yaml` exists | No |
 | architect | general-purpose | 2 | After spec-writer completes OR `system-design.yaml` missing/empty OR user requests system design / architecture | No |
 | project-task-planner | general-purpose | 2 | `{feature-path}/tasks.yaml` missing OR empty OR `{feature-path}/specs.md` changed since last run | No |
@@ -26,12 +25,12 @@ Reference for `/orchestrate` slash command. Maps SDD agents to Task tool teammat
 | security-auditor | general-purpose | 6 | security-engineer was spawned | No |
 | compliance-auditor | general-purpose | 6 | compliance-engineer was spawned | No |
 
-**Always spawn**: context-manager (T1), knowledge-synthesizer (T1), fullstack-developer (T5), test-automator (T5), qa (T6), code-reviewer (T6).
+**Always spawn**: context-manager (T1), fullstack-developer (T5), test-automator (T5), qa (T6), code-reviewer (T6).
 
 ## Tier Dependency DAG
 
 ```
-Tier 1: context-manager, knowledge-synthesizer  (parallel)
+Tier 1: context-manager  (persistent)
    |
 Tier 2: spec-writer → architect → project-task-planner  (sequential, not parallel)
    |
@@ -90,5 +89,6 @@ When complete, summarize what you did and any findings or blockers.
 - Teammates report completion by returning their summary to the orchestrator
 - If a teammate identifies a spec violation, it must create `{feature-path}/spec-change-requests.yaml`
 - The orchestrator halts on any spec-change-request and notifies the user
-- Context-manager appends all decisions and state changes to `.ops/build/decisions-log.md`
-- If any agent reports deviation, scope change, spec break, changed plan, trade-off, or constraint, the orchestrator runs knowledge-synthesizer to update build logs
+- Context-manager is the sole writer to `.ops/build/decisions-log.md` and `.ops/build/v{x}/implementation-status.md`
+- Orchestrator routes agent summaries to context-manager once per tier completion (batch)
+- If any agent summary contains a routing trigger keyword (deviation, scope change, spec break, changed plan, trade-off, constraint, spec-change-request, blocked, architecture decision, migration, security finding, compliance finding), orchestrator routes it to context-manager for deviation logging

@@ -8,7 +8,7 @@ Deterministic, artifact-driven SDD workflow:
 - Security and compliance are first-class, with both by-design and audit roles.
 - `workflow-orchestrator` closes the loop, routing implementation constraints back to spec-writer/user instead of allowing silent drift.
 - `context-manager` persists state so work is resumable, auditable, and non-chatty.
-- `knowledge-synthesizer` logs deviations and compacts build knowledge across iterations.
+- `context-manager` is the sole writer to `decisions-log.md` and `implementation-status.md` — records decisions, state changes, and deviations. No other agent writes to these files.
 - All `implements:` pointers in `.ops/build/v{x}/<feature-name>/tasks.yaml` must reference nodes defined in `.ops/build/v{x}/<feature-name>/specs.md`. Example: `implements: /paths/users/get`
 
 Canonical flow: spec → system design → tasks → safe execution → validation → gated release → logged state → spec feedback if needed.
@@ -52,7 +52,7 @@ Each agent's system prompt is read from `.claude/agents/<agent-name>.md` and com
 
 - Teammates return their summary to the orchestrator when done
 - Spec violations → `spec-change-requests.yaml` → orchestrator halts
-- Context-manager appends all decisions to `.ops/build/decisions-log.md`
+- Context-manager is the sole writer to `.ops/build/decisions-log.md` and `.ops/build/v{x}/implementation-status.md` (batch per-tier, keyword-triggered deviations)
 - `implements:` pointers flow from `tasks.yaml` into `TaskCreate` descriptions for traceability
 
 ---
@@ -62,7 +62,7 @@ Each agent's system prompt is read from `.claude/agents/<agent-name>.md` and com
 Per AGENTS.md — 6-tier structure:
 
 ```
-Tier 1: workflow-orchestrator, context-manager, knowledge-synthesizer
+Tier 1: workflow-orchestrator, context-manager
    |
 Tier 2: spec-writer → architect → project-task-planner  (sequential)
    |
@@ -75,7 +75,7 @@ Tier 5: fullstack-developer, test-automator  (parallel)
 Tier 6: qa, debugger, code-reviewer, security-auditor, compliance-auditor  (parallel)
 ```
 
-**Always spawn**: context-manager (T1), knowledge-synthesizer (T1), fullstack-developer (T5), test-automator (T5), qa (T6), code-reviewer (T6).
+**Always spawn**: context-manager (T1), fullstack-developer (T5), test-automator (T5), qa (T6), code-reviewer (T6).
 
 ---
 
@@ -86,23 +86,22 @@ The canonical agent roster lives in **AGENTS.md**. This table adds Inputs/Output
 | Agent | Role | Inputs (reads) | Outputs (writes) |
 |---|---|---|---|
 | workflow-orchestrator | Orchestration + routing | `specs.md`, `tasks.yaml`, `.ops/build/decisions-log.md`, repo status | Updates `tasks.yaml` ordering (optional); creates `spec-change-requests.yaml` when needed |
-| context-manager | Memory + decision log | Everything in `.ops/build/decisions-log.md` | Maintains append-only decision log so each iteration starts where you left off |
-| knowledge-synthesizer | Deviation logger + build knowledge compactor | Build artifacts, decisions-log, spec-change-requests | Compacted build knowledge, deviation logs |
+| context-manager | Decision log + deviation logger (sole writer) | Agent summaries, build artifacts, spec-change-requests | Maintains append-only `decisions-log.md` and `implementation-status.md` |
 | spec-writer | Spec authoring + feature breakdown | `prd.md`, product context | `specs.md` (feature requirements + acceptance criteria) |
 | architect | System design maintainer | `specs.md`, existing `system-design.yaml` | `.ops/build/system-design.yaml`; creates `spec-change-requests.yaml` if spec/architecture mismatch found |
 | project-task-planner | Spec handoff / ticket writer | `specs.md`, `system-design.yaml`, existing `.ops/build/decisions-log.md` | `tasks.yaml` (tickets with `implements:` pointers) |
 | ui-designer | UX intent + flows | `specs.md`, `tasks.yaml` scope, existing UI patterns, `.ops/ui-design-system.md` | UX flows, screens, states, accessibility notes |
 | frontend-designer | Design-to-implementation translator | UI specs, codebase components, `tasks.yaml` | Component breakdown (components/props/states) |
-| fullstack-developer | Primary builder | `tasks.yaml`, `specs.md`, UI specs, `db-migration-plan.yaml` (if any), repo code | Code changes + tests; links in `.ops/build/decisions-log.md` |
-| database-administrator | Migration strategist / safety gate | `specs.md` schema intent, current DB schema, `tasks.yaml` | `db-migration-plan.yaml` (expand/contract/backfill/rollback); notes in `.ops/build/decisions-log.md` |
+| fullstack-developer | Primary builder | `tasks.yaml`, `specs.md`, UI specs, `db-migration-plan.yaml` (if any), repo code | Code changes + tests |
+| database-administrator | Migration strategist / safety gate | `specs.md` schema intent, current DB schema, `tasks.yaml` | `db-migration-plan.yaml` (expand/contract/backfill/rollback) |
 | qa | Contract validation + exploratory | `specs.md` (`implements:` pointers), `tasks.yaml`, running app/test outputs | Validation results; may open issues in `tasks.yaml` |
-| test-automator | Automated test implementer | `specs.md`, `tasks.yaml`, repo test setup | Test files + fixtures; notes in `.ops/build/decisions-log.md` |
-| debugger | Root-cause investigator | Failing test logs, QA repro steps, recent diffs | Fix tickets in `tasks.yaml`; notes in `.ops/build/decisions-log.md` |
-| code-reviewer | Quality gate | PR diff, `tasks.yaml`, `specs.md` | Review notes; may add required-fix tasks to `tasks.yaml`; notes in `.ops/build/decisions-log.md` |
+| test-automator | Automated test implementer | `specs.md`, `tasks.yaml`, repo test setup | Test files + fixtures |
+| debugger | Root-cause investigator | Failing test logs, QA repro steps, recent diffs | Fix tickets in `tasks.yaml` |
+| code-reviewer | Quality gate | PR diff, `tasks.yaml`, `specs.md` | Review notes; may add required-fix tasks to `tasks.yaml` |
 | security-engineer | Secure-by-design implementer | `tasks.yaml`, auth model, infra context | Security patterns/decisions; updates `specs.md` with security checks |
-| security-auditor | Independent security reviewer | PR diff, runtime config, dependency list | Findings list; remediation tasks in `tasks.yaml`; notes in `.ops/build/decisions-log.md` |
+| security-auditor | Independent security reviewer | PR diff, runtime config, dependency list | Findings list; remediation tasks in `tasks.yaml` |
 | compliance-engineer | Compliance-by-design | `tasks.yaml`, `specs.md`, data flows/PHI assumptions | Compliance requirements; updates `specs.md` with compliance checks |
-| compliance-auditor | Independent compliance reviewer | PR diff, logs/audit trails, data handling | Findings list; remediation tasks in `tasks.yaml`; notes in `.ops/build/decisions-log.md` |
+| compliance-auditor | Independent compliance reviewer | PR diff, logs/audit trails, data handling | Findings list; remediation tasks in `tasks.yaml` |
 
 ---
 
