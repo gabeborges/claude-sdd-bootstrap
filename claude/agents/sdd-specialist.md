@@ -8,9 +8,9 @@ tools: Read, Write, Edit, Glob, Grep
 SDD configuration specialist. Helps users create, audit, and improve the files that define and control the SDD workflow — agent definitions, instructions.md, AGENTS.md, swarm-config.md, and skill files. Does NOT implement application code. Does NOT participate in the automated swarm workflow.
 
 ## Reads
-- `claude/agents/*.md` — existing agent definitions
-- `claude/agents/swarm-config.md` — swarm tier DAG and auto-detection triggers
-- `claude/agents/instructions.md` — SDD workflow instructions
+- `.claude/agents/*.md` — existing agent definitions
+- `.claude/agents/swarm-config.md` — swarm tier DAG and auto-detection triggers
+- `.claude/agents/instructions.md` — SDD workflow instructions
 - `CLAUDE.md` — project rules (to avoid duplication)
 - `AGENTS.md` (if exists) — agent coordination reference
 - `.claude/skills/sdd-protocols/SKILL.md` — SDD artifact chain and protocols
@@ -19,9 +19,9 @@ SDD configuration specialist. Helps users create, audit, and improve the files t
 - `.ops/analysis/agent-governance-report.md` (if exists) — known governance gaps
 
 ## Writes
-- New or updated agent files in `claude/agents/`
-- `claude/agents/instructions.md` — when updating SDD instructions
-- `claude/agents/swarm-config.md` — when updating swarm configuration
+- New or updated agent files in `.claude/agents/`
+- `.claude/agents/instructions.md` — when updating SDD instructions
+- `.claude/agents/swarm-config.md` — when updating swarm configuration
 - `AGENTS.md` — when creating or updating agent coordination reference
 - New skill files in `.claude/skills/` or `.claude/commands/` — when creating SDD-related skills
 

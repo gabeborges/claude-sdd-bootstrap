@@ -24,7 +24,7 @@ Pre-flight readiness check for a feature workspace. Determines which SDD tier th
 Before running this command, understand the SDD tier structure:
 
 1. `.claude/skills/sdd-protocols/SKILL.md` — artifact chain, tier prerequisites
-2. `claude/agents/instructions.md` — SDD artifact flow, dependency DAG
+2. `.claude/agents/instructions.md` — SDD artifact flow, dependency DAG
 
 ---
 
@@ -34,12 +34,11 @@ Based on `.claude/skills/sdd-protocols/SKILL.md`:
 
 | Tier | Required Artifacts | Agent(s) |
 |------|-------------------|----------|
-| **Tier 1** | None (orchestration starts) | workflow-orchestrator, context-manager |
-| **Tier 2** | `prd.md`, `specs.md`, `system-design.yaml`, `tasks.yaml` | spec-writer → architect → project-task-planner |
+| **Tier 1** | None (context-manager, lazy) | context-manager |
+| **Tier 2** | `prd.md`, `specs.md`, `system-design.yaml`, `tasks.yaml` | spec-writer → architect → database-administrator → project-task-planner |
 | **Tier 3** | All Tier 2 artifacts | ui-designer, security-engineer, compliance-engineer |
-| **Tier 4** | All Tier 2 artifacts + Tier 3 outputs (if applicable) | frontend-designer, database-administrator |
-| **Tier 5** | All Tier 2 artifacts + Tier 3-4 outputs (if applicable) | fullstack-developer, test-automator |
-| **Tier 6** | All Tier 2-5 artifacts + implementation complete | qa, debugger, code-reviewer, security-auditor, compliance-auditor |
+| **Tier 4** | All Tier 2 artifacts + Tier 3 outputs (if applicable) | fullstack-developer, test-automator |
+| **Tier 5** | All Tier 2-4 artifacts + implementation complete | qa, debugger, code-reviewer, security-auditor, compliance-auditor |
 
 ---
 
@@ -153,7 +152,7 @@ Based on artifact presence:
 - Ready for: ui-designer, security-engineer, compliance-engineer
 - Auto-detection: scan `specs.md` and `tasks.yaml` for keywords (see swarm-config.md)
 
-**Tier 4 Ready** (Implementation prep)
+**Tier 4 Ready** (Implementation)
 - All Tier 2 artifacts exist
 - Tier 3 outputs present (if agents were triggered):
   - `ui.md` present if UI keywords detected
@@ -161,20 +160,16 @@ Based on artifact presence:
   - `compliance.yaml` present if compliance keywords detected
 - Build-level: `db-migration-plan.yaml` present at `.ops/build/v{x}/db-migration-plan.yaml` (if DB keywords detected)
 - Build-level: `build-order.yaml` present at `.ops/build/v{x}/build-order.yaml` (if multiple features in build)
-- Ready for: frontend-designer, database-administrator
-
-**Tier 5 Ready** (Implementation)
-- All Tier 2-4 artifacts exist
 - No open `spec-change-requests.yaml`
 - Ready for: fullstack-developer, test-automator
 
-**Tier 6 Ready** (Validation gates)
-- All Tier 2-5 artifacts exist
+**Tier 5 Ready** (Validation gates)
+- All Tier 2-4 artifacts exist
 - Implementation tasks marked complete
 - Ready for: qa, code-reviewer, security-auditor, compliance-auditor
 
 **Merge Ready**
-- All Tier 6 gates pass (`checks.yaml` all `status: pass`)
+- All Tier 5 gates pass (`checks.yaml` all `status: pass`)
 - No open blockers
 
 ---
@@ -185,7 +180,7 @@ Based on artifact presence:
 # Gate Check Report: <feature-name>
 
 **Workspace**: `.ops/build/v{x}/<feature-name>`
-**Current Tier**: Tier 5 (Implementation)
+**Current Tier**: Tier 4 (Implementation)
 **Status**: READY | BLOCKED | INCOMPLETE
 
 ---
@@ -212,13 +207,12 @@ Based on artifact presence:
 - [x] **Tier 1** — Orchestration (always ready)
 - [x] **Tier 2** — Spec/Design/Tasks (artifacts present)
 - [x] **Tier 3** — Optional design agents (artifacts present)
-- [x] **Tier 4** — Implementation prep (artifacts present)
-- [x] **Tier 5** — Implementation (artifacts present)
-- [ ] **Tier 6** — Validation gates (BLOCKED: failing gates)
+- [x] **Tier 4** — Implementation (artifacts present)
+- [ ] **Tier 5** — Validation gates (BLOCKED: failing gates)
 - [ ] **Merge Ready** (BLOCKED: failing gates)
 
-**Current Tier**: Tier 5 (Implementation)
-**Next Tier**: Tier 6 (Validation gates) — BLOCKED
+**Current Tier**: Tier 4 (Implementation)
+**Next Tier**: Tier 5 (Validation gates) — BLOCKED
 
 ---
 
@@ -236,7 +230,7 @@ Based on artifact presence:
 
 ## Next Steps
 
-**What's Blocking Tier 6:**
+**What's Blocking Tier 5:**
 - Fix 2 failing gate checks in `checks.yaml`
 - Security blocker: T-010 (fix input validation)
 - QA blocker: T-004 (fix pagination response)
@@ -244,14 +238,14 @@ Based on artifact presence:
 **Recommendation:**
 1. Resolve blockers: T-004, T-010
 2. Re-run security-auditor and qa agents
-3. Once all gates pass, proceed to Tier 6
+3. Once all gates pass, proceed to Tier 5
 
 ---
 
 ## Summary
 
-**Ready For**: Tier 5 (Implementation) — remediation tasks in progress
-**Blocked From**: Tier 6 (Validation) — 2 failing gates
+**Ready For**: Tier 4 (Implementation) — remediation tasks in progress
+**Blocked From**: Tier 5 (Validation) — 2 failing gates
 **Missing**: None (all artifacts present)
 **Stale**: None (all artifacts in sync)
 ```

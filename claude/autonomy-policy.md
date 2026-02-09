@@ -1,6 +1,6 @@
 # Autonomy Policy — Decision Framework for Claude Code Agents
 
-Reference document for agents. Import via `@claude/autonomy-policy.md`.
+Reference document for agents. Import via `@.claude/autonomy-policy.md`.
 
 ## Should I Ask or Act? — Decision Tree
 

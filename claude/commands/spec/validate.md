@@ -28,7 +28,7 @@ Validates a feature workspace to ensure:
 Before running this command, understand the SDD artifact protocol:
 
 1. `.claude/skills/sdd-protocols/SKILL.md` — artifact chain, `implements:` pointer protocol, spec node format
-2. `claude/agents/instructions.md` — artifact flow rules (specs → system-design → tasks)
+2. `.claude/agents/instructions.md` — artifact flow rules (specs → system-design → tasks)
 
 ---
 

@@ -130,7 +130,7 @@ User List → click "Add User" → Create User Form
 
 ## Component State Patterns
 
-Map screen states to component props (from frontend-designer):
+Map screen states to component props (from ui-designer):
 
 ### State Prop Pattern
 

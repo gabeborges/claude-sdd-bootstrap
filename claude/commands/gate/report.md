@@ -24,7 +24,7 @@ Aggregates all gate results from `checks.yaml` for a feature workspace. Shows wh
 Before running this command, understand the gate schema:
 
 1. `.claude/skills/sdd-protocols/SKILL.md` — checks.yaml schema, gate sections, status values
-2. `claude/agents/instructions.md` — SDD tier structure, validation gates
+2. `.claude/agents/instructions.md` — SDD tier structure, validation gates
 
 ---
 
@@ -285,7 +285,7 @@ If `checks.yaml` doesn't exist, report:
 ```
 Status: INCOMPLETE
 Reason: No gate results found
-Next Steps: Run validation agents (Tier 6) to generate gate results
+Next Steps: Run validation agents (Tier 5) to generate gate results
 ```
 
 ### Partial checks.yaml
@@ -293,7 +293,7 @@ If only some sections exist (e.g., only `qa_validation` and `testing`), report:
 ```
 WARNING: Incomplete gate coverage
 Missing gates: db_migration, code_review, security_audit, compliance_audit
-Recommendation: Run all Tier 6 agents before merging
+Recommendation: Run all Tier 5 agents before merging
 ```
 
 ### All Gates Pass

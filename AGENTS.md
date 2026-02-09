@@ -121,25 +121,24 @@ When finishing work, report:
 
 | Agent | Role | Category | File |
 |-------|------|----------|------|
-| Workflow Orchestrator | Orchestration + routing | orchestration | `claude/agents/workflow-orchestrator.md` |
-| Context Manager | Decision log + deviation logger (sole writer) | orchestration | `claude/agents/context-manager.md` |
-| Spec Writer | Spec authoring + feature breakdown | planning | `claude/agents/spec-writer.md` |
-| Architect | System design maintainer | planning | `claude/agents/architect.md` |
-| Database Administrator | Migration strategist / safety gate | planning | `claude/agents/database-administrator.md` |
-| Project Task Planner | Spec handoff / ticket writer | planning | `claude/agents/project-task-planner.md` |
-| UI Designer | UX intent + flows | design | `claude/agents/ui-designer.md` |
-| Frontend Designer | Design-to-implementation translator | design | `claude/agents/frontend-designer.md` |
-| Fullstack Developer | Primary builder | implementation | `claude/agents/fullstack-developer.md` |
-| QA | Contract validation + exploratory | quality | `claude/agents/qa.md` |
-| Test Automator | Automated test implementer | quality | `claude/agents/test-automator.md` |
-| Debugger | Root-cause investigator | quality | `claude/agents/debugger.md` |
-| Code Reviewer | Quality gate | quality | `claude/agents/code-reviewer.md` |
-| Security Engineer | Secure-by-design implementer | security | `claude/agents/security-engineer.md` |
-| Security Auditor | Independent security reviewer | security | `claude/agents/security-auditor.md` |
-| Compliance Engineer | Compliance-by-design | compliance | `claude/agents/compliance-engineer.md` |
-| Compliance Auditor | Compliance reviewer | compliance | `claude/agents/compliance-auditor.md` |
-| SDD Specialist | SDD workflow config creator/auditor | meta | `claude/agents/sdd-specialist.md` |
-| Claude Code Specialist | CLAUDE.md/AGENTS.md/agent/skill optimizer | meta | `claude/agents/claude-code-specialist.md` |
+| Workflow Orchestrator | Orchestration + routing | orchestration | `.claude/agents/workflow-orchestrator.md` |
+| Context Manager | Decision log + deviation logger (sole writer) | orchestration | `.claude/agents/context-manager.md` |
+| Spec Writer | Spec authoring + feature breakdown | planning | `.claude/agents/spec-writer.md` |
+| Architect | System design maintainer | planning | `.claude/agents/architect.md` |
+| Database Administrator | Migration strategist / safety gate | planning | `.claude/agents/database-administrator.md` |
+| Project Task Planner | Spec handoff / ticket writer | planning | `.claude/agents/project-task-planner.md` |
+| UI Designer | UX flows + component architecture | design | `.claude/agents/ui-designer.md` |
+| Fullstack Developer | Primary builder | implementation | `.claude/agents/fullstack-developer.md` |
+| QA | Contract validation + exploratory | quality | `.claude/agents/qa.md` |
+| Test Automator | Automated test implementer | quality | `.claude/agents/test-automator.md` |
+| Debugger | Root-cause investigator | quality | `.claude/agents/debugger.md` |
+| Code Reviewer | Quality gate | quality | `.claude/agents/code-reviewer.md` |
+| Security Engineer | Secure-by-design implementer | security | `.claude/agents/security-engineer.md` |
+| Security Auditor | Independent security reviewer | security | `.claude/agents/security-auditor.md` |
+| Compliance Engineer | Compliance-by-design | compliance | `.claude/agents/compliance-engineer.md` |
+| Compliance Auditor | Compliance reviewer | compliance | `.claude/agents/compliance-auditor.md` |
+| SDD Specialist | SDD workflow config creator/auditor | meta | `.claude/agents/sdd-specialist.md` |
+| Claude Code Specialist | CLAUDE.md/AGENTS.md/agent/skill optimizer | meta | `.claude/agents/claude-code-specialist.md` |
 
 ## By Category
 
@@ -154,8 +153,7 @@ When finishing work, report:
 - **Project Task Planner** — Parses specs into feature `tasks.yaml` with `implements:` pointers
 
 ### Design
-- **UI Designer** — UX flows, screens, states, accessibility
-- **Frontend Designer** — Component breakdown (props/states) from UI specs
+- **UI Designer** — UX flows, screens, states, accessibility, and component architecture (props/states/data requirements)
 
 ### Implementation
 - **Fullstack Developer** — Primary code writer, implements feature `tasks.yaml` with tests
@@ -179,17 +177,15 @@ When finishing work, report:
 ## Dependency DAG
 
 ```
-Tier 1: workflow-orchestrator, context-manager
+Tier 1: context-manager  (lazy — invoked on triggers or at end)
    ↓
 Tier 2: spec-writer → architect → database-administrator (if DB keywords) → project-task-planner  (sequential)
    ↓
 Tier 3: ui-designer, security-engineer, compliance-engineer  (parallel, if detected)
    ↓
-Tier 4: frontend-designer  (if detected)
+Tier 4: fullstack-developer, test-automator  (parallel)
    ↓
-Tier 5: fullstack-developer, test-automator  (parallel)
-   ↓
-Tier 6: qa, debugger, code-reviewer, security-auditor, compliance-auditor  (parallel)
+Tier 5: qa, debugger, code-reviewer, security-auditor, compliance-auditor  (parallel)
 ```
 
 ## Agent Selection Guide
@@ -201,7 +197,7 @@ Tier 6: qa, debugger, code-reviewer, security-auditor, compliance-auditor  (para
 | System design needed / architecture decisions | architect |
 | Spec ready, need system design before tasks | architect |
 | Spec ready, need feature tasks | project-task-planner |
-| Feature has UI | ui-designer → frontend-designer |
+| Feature has UI | ui-designer |
 | Feature has DB changes | database-administrator |
 | Ready to implement | fullstack-developer |
 | Implementation done, need validation | qa + test-automator |
@@ -212,7 +208,7 @@ Tier 6: qa, debugger, code-reviewer, security-auditor, compliance-auditor  (para
 | Need to record a decision | context-manager |
 | Spec can't be implemented as-is | workflow-orchestrator (creates spec-change-request) |
 
-**UI system rule:** Before any UI work, check for `.ops/ui-design-system.md`. If missing, run `/interface-design:init`. If present, `ui-designer` and `frontend-designer` MUST follow it. Use `frontend-design` skill for simple one-off pages/components.
+**UI system rule:** Before any UI work, check for `.ops/ui-design-system.md`. If missing, run `/interface-design:init`. If present, `ui-designer` MUST follow it. Use `frontend-design` skill for simple one-off pages/components.
 
 ## Spec Change Request Resolution Workflow
 
@@ -229,12 +225,17 @@ When any agent creates `spec-change-requests.yaml`:
 
 ## Swarm Orchestration
 
-Use `/orchestrate <feature-path>` to run the full SDD build phase automatically.
+| Command | Tiers | Use Case |
+|---------|-------|----------|
+| `/orchestrate:plan <path>` | T1-T2 | Planning only — specs, design, tasks |
+| `/orchestrate:build <path>` | T3-T5 | Design + implement + validate |
+| `/orchestrate:validate <path>` | T5 | QA + review only |
+| `/orchestrate <path>` | Auto-detect | Routes based on artifact state |
 
 Feature workspace: `.ops/build/v{x}/<feature-name>/`
 
 The workflow-orchestrator spawns agents tier-by-tier and auto-detects which optional agents are needed from `tasks.yaml` / `specs.md` content.
-See [claude/agents/swarm-config.md](claude/agents/swarm-config.md) for agent-teammate mapping and keyword triggers.
+See [.claude/agents/swarm-config.md](.claude/agents/swarm-config.md) for agent-teammate mapping and keyword triggers.
 
 ## Parallel Execution Strategy
 
@@ -306,5 +307,5 @@ TaskUpdate(task_id="T-001", status="blocked", note="Needs user clarification on 
 
 ## Supporting References
 
-- Agent roles, inputs, outputs: [claude/agents/instructions.md](claude/agents/instructions.md)
-- Swarm orchestration config: [claude/agents/swarm-config.md](claude/agents/swarm-config.md)
+- Agent roles, inputs, outputs: [.claude/agents/instructions.md](.claude/agents/instructions.md)
+- Swarm orchestration config: [.claude/agents/swarm-config.md](.claude/agents/swarm-config.md)

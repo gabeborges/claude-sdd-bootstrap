@@ -73,12 +73,12 @@ Adapt these defaults in `CLAUDE.md` for your stack.
 - **`CLAUDE.md`** — Auto-loaded every session. Defines stack, security rules, coding standards, architecture boundaries, and SDD artifact flow.
 - **`AGENTS.md`** — Agent coordination reference. Defines artifact priority table, agent roles, and orchestration rules.
 
-### 2. Agent Swarm (20 Specialized Agents)
+### 2. Agent Swarm (19 Specialized Agents)
 
 | Category | Agents |
 |----------|--------|
 | **Planning & Architecture** | architect, spec-writer, project-task-planner |
-| **Development** | fullstack-developer, frontend-designer, ui-designer, database-administrator |
+| **Development** | fullstack-developer, ui-designer, database-administrator |
 | **Quality** | code-reviewer, qa, test-automator, debugger |
 | **Security & Compliance** | security-engineer, security-auditor, compliance-engineer, compliance-auditor |
 | **Meta/Orchestration** | workflow-orchestrator, context-manager, claude-code-specialist, sdd-specialist |
