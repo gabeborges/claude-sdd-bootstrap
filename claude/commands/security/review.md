@@ -7,8 +7,8 @@ description: Security review of code changes — checks auth, OWASP, input valid
 
 Before starting the review, read these files completely:
 
-1. `~/.claude/skills/security-patterns/SKILL.md` — security patterns, auth, validation, secrets
-2. `~/.claude/skills/security-patterns/references/owasp-checklist.md` — detailed OWASP Top 10 checks
+1. `.claude/skills/security-patterns/SKILL.md` — security patterns, auth, validation, secrets
+2. `.claude/skills/security-patterns/references/owasp-checklist.md` — detailed OWASP Top 10 checks
 
 Do not skip this. The security knowledge is in these files.
 
@@ -99,7 +99,7 @@ Walk through each check category:
 
 #### **OWASP Top 10 Quick Scan**
 
-Reference `~/.claude/skills/security-patterns/references/owasp-checklist.md` for detailed checks.
+Reference `.claude/skills/security-patterns/references/owasp-checklist.md` for detailed checks.
 
 **A1: Broken Access Control**
 - Auth checks present on endpoints

@@ -52,11 +52,6 @@ Testing: Vitest + Playwright | Package manager: npm | Workflow: SDD (Clavix + Ag
 - Use parallel task execution (`Task` tool) for independent work items
 - When implementing from `tasks.yaml`, execute tasks in dependency order but parallelize independent tasks
 
-## Git Identity
-- `user.name = YourGitHubUsername`
-- `user.email = your.email@example.com`
-- Origin: `git@github.com:YourGitHubUsername/<repo>.git`
-
 ## Next.js (App Router)
 - App Router (`app/`) is authoritative
 - Prefer Server Components by default; use `"use client"` only when required
@@ -111,11 +106,7 @@ npm run build
 - Do not mix build versions (`v0`, `v1`, `v2`) in a single change or commit
 
 ## SDD Artifact Flow
-- Canonical order: `specs.md` (spec-writer) → `system-design.yaml` (architect) → `db-migration-plan.yaml` (build-level, conditional) → `tasks.yaml` (per feature) → `build-order.yaml` (cross-feature, conditional)
-- Do not create `specs.md` until `prd.md` exists for that build version
-- Do not create `tasks.yaml` until `system-design.yaml` exists
-- Do not create `db-migration-plan.yaml` until `system-design.yaml` exists — one consolidated plan per build version at `.ops/build/v{x}/db-migration-plan.yaml`
-- Do not create `build-order.yaml` until all feature `tasks.yaml` files exist for the build version
+See AGENTS.md § "SDD Artifact Flow" for canonical order, prerequisite rules, and stop conditions.
 
 ## Token/Context Rules
 - Default to feature-scoped reads only

@@ -73,21 +73,7 @@ Each agent's system prompt is read from `.claude/agents/<agent-name>.md` and com
 
 ## Dependency DAG
 
-Per AGENTS.md — 5-tier structure:
-
-```
-Tier 1: context-manager  (lazy — invoked on triggers or at end)
-   |
-Tier 2: spec-writer → architect → database-administrator (if DB keywords) → project-task-planner  (sequential)
-   |
-Tier 3: ui-designer, security-agent (Phase 1), compliance-agent (Phase 1)  (parallel, if detected)
-   |
-Tier 4: fullstack-developer, test-automator  (parallel)
-   |
-Tier 5: qa, debugger, code-reviewer, security-agent (Phase 2), compliance-agent (Phase 2)  (parallel)
-```
-
-**Always spawn**: fullstack-developer (T4), test-automator (T4), qa (T5), code-reviewer (T5).
+See AGENTS.md § "Dependency DAG" and `.claude/agents/swarm-config.md` for the canonical 5-tier structure, auto-detection keywords, and execution modes.
 
 ---
 
@@ -116,32 +102,7 @@ The canonical agent roster lives in **AGENTS.md**. This table adds Inputs/Output
 
 ## Folder Structure
 
-Per AGENTS.md:
-
-```
-.ops/
-├── product-vision-strategy.md          (canonical — do not load unless cross-domain)
-├── quick-product-vision-strategy.md    (distilled: §1–§7, §12 — product agents)
-├── security-compliance-baseline.md     (distilled: §10 partial, §11, §12, §15, §16 — security/compliance agents)
-├── tech-architecture-baseline.md       (distilled: §8–§10, §12–§16 — architecture agents)
-├── ui-design-system.md (optional)
-└── build/
-    ├── decisions-log.md
-    ├── system-design.yaml
-    └── v{x}/
-        ├── prd.md
-        ├── implementation-status.md
-        ├── db-migration-plan.yaml
-        ├── build-order.yaml (conditional — multi-feature builds)
-        └── <feature-name>/
-            ├── specs.md
-            ├── tasks.yaml
-            ├── ui.md (conditional — features with UI)
-            ├── security.yaml (conditional — security-sensitive features)
-            ├── compliance.yaml (conditional — compliance-sensitive features)
-            ├── checks.yaml
-            └── spec-change-requests.yaml (optional)
-```
+See AGENTS.md § "Folder Structure" for the canonical `.ops/` directory layout.
 
 ### Gate Output
 - `.ops/build/v{x}/<feature-name>/checks.yaml`: single YAML file with sections for security/compliance/qa/code_review/testing.

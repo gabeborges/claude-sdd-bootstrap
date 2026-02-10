@@ -7,7 +7,7 @@ description: Systematic root-cause analysis for failures — reproduce, trace, n
 
 Before starting the investigation, read this file completely:
 
-1. `~/.claude/skills/debugging/SKILL.md` — methodology, fix ticket format, common failure patterns
+1. `.claude/skills/debugging/SKILL.md` — methodology, fix ticket format, common failure patterns
 
 Do not skip this. The debugging methodology is in this file.
 

@@ -68,6 +68,16 @@ Follow `@.claude/autonomy-policy.md` escalation ladder. Key rules:
 - Never expose Supabase client keys or bypass RLS
 - Use `createServerClient()` in Server Components, `createBrowserClient()` only in `"use client"` components when unavoidable
 
+### Stripe Integration
+- Server/client config via `/lib/stripe.js`; checkout flow via `/app/api/checkout/route.js`
+- Always verify webhook signatures using `stripe.webhooks.constructEvent`
+- Price IDs and billing logic must be server-side only — never trust client-provided price data
+- Frontend uses `@stripe/react-stripe-js`; do not alter billing semantics without spec/tasks
+
+### Google OAuth
+- Do not relax OAuth scopes, callback URLs, or token handling without spec reference
+- Token refresh and session management handled server-side via Supabase Auth
+
 ## Process
 For each task:
 1. Read the `implements:` pointer to understand the spec requirement
