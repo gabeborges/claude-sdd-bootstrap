@@ -1,0 +1,175 @@
+# Booking Notifications -- Tasks
+# Feature: booking-notifications
+# Spec: .ops/build/v0/booking-notifications/specs.md
+# Generated: 2026-02-06
+
+- id: T-BN-001
+  title: "Create notification_log table migration (DB phase 8)"
+  implements: "booking-notifications/R13, booking-notifications/R15"
+  status: pending
+  tier: db
+  acceptance: >
+    notification_log table created per db-migration-plan.yaml phase 8 SQL.
+    Columns: id, booking_id (FK), therapist_id (FK), notification_type, recipient_type,
+    recipient_email_hash (hashed, not plaintext), status, resend_message_id,
+    error_message, retry_count, scheduled_for, sent_at, created_at.
+    Status CHECK IN (sent, failed, pending, suppressed).
+    RLS enabled. FK to bookings (ON DELETE CASCADE) and therapists.
+    Migration file: 20260206000008_create_notification_log.sql.
+  depends_on:
+    - T-BP-002
+    - T-TS-001
+
+- id: T-BN-002
+  title: "Apply RLS policies for notification_log table (DB phase 9 -- notification_log portion)"
+  implements: "booking-notifications/R15"
+  status: pending
+  tier: db
+  acceptance: >
+    notification_log_select_own, notification_log_insert_service,
+    notification_log_update_service policies applied.
+    Therapist reads own. System writes only (via service_role).
+  depends_on:
+    - T-BN-001
+
+- id: T-BN-003
+  title: "Apply indexes for notification_log table (DB phase 10 -- notification_log portion)"
+  implements: "booking-notifications/R13"
+  status: pending
+  tier: db
+  acceptance: >
+    idx_notification_log_booking (booking_id, notification_type).
+    idx_notification_log_pending_scheduled (scheduled_for, status) WHERE pending + scheduled.
+    idx_notification_log_therapist (therapist_id, created_at DESC).
+  depends_on:
+    - T-BN-002
+
+- id: T-BN-004
+  title: "Configure Resend email provider integration"
+  implements: "booking-notifications/R9, booking-notifications/R15"
+  status: pending
+  tier: integration
+  acceptance: >
+    Resend SDK configured with API key (environment variable, not hardcoded).
+    Sender domain verified. Sender address configured (e.g., bookings@curio.health).
+    Data residency compliance verified with Resend.
+    Helper function sendEmail(to, subject, html) wrapping Resend API.
+  depends_on: []
+
+- id: T-BN-005
+  title: "Create email templates (confirmation, reschedule, cancellation, reminder)"
+  implements: "booking-notifications/R10, booking-notifications/R11, booking-notifications/R12, booking-notifications/R16, booking-notifications/R17, booking-notifications/S11"
+  status: pending
+  tier: backend
+  acceptance: >
+    Email templates for: booking_confirmation, booking_reschedule, booking_cancellation,
+    reminder_24h, reminder_1h.
+    Each template includes: service name, date/time (therapist timezone), therapist/practice name.
+    Confirmation + reminder templates include manage-booking link (tokenized).
+    Online appointment templates include Google Meet link.
+    No client phone number or internal IDs in email content.
+    Curio identified as sender. Therapist practice name included.
+    Templates have proper HTML structure, alt text, accessible design.
+  depends_on:
+    - T-BN-004
+
+- id: T-BN-006
+  title: "Implement booking confirmation email dispatch (client + therapist)"
+  implements: "booking-notifications/R1, booking-notifications/R2, booking-notifications/R13, booking-notifications/R18, booking-notifications/S1, booking-notifications/S2, booking-notifications/S3, booking-notifications/S10"
+  status: pending
+  tier: backend
+  acceptance: >
+    On booking.created event: send confirmation email to client and notification to therapist.
+    Client email includes: service name, date/time, therapist name, manage-booking link.
+    For online appointments: includes Google Meet link.
+    Therapist email includes: client name, service, date/time.
+    Logged in notification_log (type, status, booking ref, recipient_email_hash).
+    Email failure does not block or rollback booking. Failure logged. Retry attempted.
+  depends_on:
+    - T-BN-005
+    - T-BP-007
+    - T-BN-001
+    - T-BN-002
+
+- id: T-BN-007
+  title: "Implement rescheduling notification email dispatch"
+  implements: "booking-notifications/R3, booking-notifications/R4, booking-notifications/R13, booking-notifications/S4, booking-notifications/S5"
+  status: pending
+  tier: backend
+  acceptance: >
+    On booking.rescheduled event: send reschedule email to client and therapist.
+    Client email shows old time and new time clearly (old time crossed out or indicated).
+    Therapist email includes old and new times.
+    Logged in notification_log.
+    Email failure does not block reschedule operation.
+  depends_on:
+    - T-BN-005
+    - T-BM-002
+
+- id: T-BN-008
+  title: "Implement cancellation notification email dispatch"
+  implements: "booking-notifications/R5, booking-notifications/R6, booking-notifications/R13, booking-notifications/S6"
+  status: pending
+  tier: backend
+  acceptance: >
+    On booking.cancelled event: send cancellation email to client and therapist.
+    Client email confirms cancellation with original appointment details.
+    Therapist email includes cancellation notification with client name and time.
+    Logged in notification_log.
+    Email failure does not block cancellation.
+  depends_on:
+    - T-BN-005
+    - T-BM-003
+
+- id: T-BN-009
+  title: "Implement appointment reminder scheduling (24h and 1h before)"
+  implements: "booking-notifications/R7, booking-notifications/R8, booking-notifications/R14, booking-notifications/S7, booking-notifications/S8, booking-notifications/S9"
+  status: pending
+  tier: backend
+  acceptance: >
+    On booking.created: schedule two reminder entries in notification_log with
+    scheduled_for = (start_time - 24h) and (start_time - 1h), status='pending'.
+    Cron job or scheduled function processes pending reminders at their scheduled_for time.
+    Reminders include appointment details and manage-booking link.
+    For online appointments: includes Meet link.
+    Suppression: before sending, check booking status. If cancelled, set status='suppressed' and skip.
+    Reminder for cancelled booking is NOT sent.
+  depends_on:
+    - T-BN-005
+    - T-BN-001
+    - T-BN-003
+
+- id: T-BN-010
+  title: "Implement email retry logic for failed deliveries"
+  implements: "booking-notifications/R18, booking-notifications/S10"
+  status: pending
+  tier: backend
+  acceptance: >
+    On email delivery failure: log error in notification_log (status='failed', error_message).
+    Retry with backoff (configurable retry count and intervals).
+    retry_count incremented on each attempt.
+    Booking is never blocked or rolled back due to email failure.
+    After max retries, notification stays in 'failed' status for manual review.
+  depends_on:
+    - T-BN-006
+
+- id: T-BN-011
+  title: "Write tests for notification dispatch and reminder system"
+  implements: "booking-notifications/S1, booking-notifications/S2, booking-notifications/S3, booking-notifications/S4, booking-notifications/S5, booking-notifications/S6, booking-notifications/S7, booking-notifications/S8, booking-notifications/S9, booking-notifications/S10, booking-notifications/S11"
+  status: pending
+  tier: test
+  acceptance: >
+    Unit tests: email template rendering (correct content, no phone/internal IDs),
+    reminder scheduling (correct times), suppression logic.
+    Integration tests: confirmation dispatch (mock Resend), reschedule notification,
+    cancellation notification, reminder processing.
+    Edge cases: email failure does not block booking (S10),
+    cancelled booking reminders suppressed (S9),
+    online appointment includes Meet link (S3),
+    data minimization in email content (S11).
+  depends_on:
+    - T-BN-006
+    - T-BN-007
+    - T-BN-008
+    - T-BN-009
+    - T-BN-010

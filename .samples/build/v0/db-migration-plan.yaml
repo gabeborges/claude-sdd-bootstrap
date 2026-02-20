@@ -1,0 +1,954 @@
+# Curio v0 -- Consolidated Database Migration Plan
+# Greenfield schema creation for booking & scheduling system.
+# All tables are new; no existing data to migrate.
+#
+# Generated: 2026-02-06
+# Source: system-design.yaml (data.entities, data.key_constraints)
+# Compliance: HIPAA/PHIPA from day 0, Canada-region data residency,
+#   RLS on every table, PHI minimization, audit immutability.
+
+db_change:
+  required: true
+
+  # ============================================================
+  # MIGRATION PHASES -- ordered by FK dependency chain
+  # All phases are "expand" (additive, greenfield).
+  # No contract phases exist because there is no prior schema.
+  # ============================================================
+
+  migrations:
+
+    # ----------------------------------------------------------
+    # Phase 1: therapists (no FK dependencies -- root table)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create therapists table -- root entity, no FK dependencies.
+        Stores therapist profile, practice config, Google OAuth tokens,
+        and onboarding state. Tokens stored in encrypted columns.
+      sql: |
+        CREATE TABLE therapists (
+          id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          google_id       text UNIQUE NOT NULL,
+          email           text NOT NULL,
+          full_name       text NOT NULL,
+          practice_name   text NOT NULL,
+          timezone        text NOT NULL,  -- IANA timezone identifier
+          slug            text UNIQUE NOT NULL,  -- used in booking URL /{slug}/booking
+          setup_completed_at  timestamptz,  -- NULL until setup finishes
+          setup_step      text NOT NULL DEFAULT 'practice_details',  -- tracks onboarding progress
+
+          -- Google OAuth (encrypted at rest via Supabase vault / column encryption)
+          google_oauth_access_token    text,  -- NOT NULL after calendar connection
+          google_oauth_refresh_token   text,  -- NOT NULL after calendar connection
+          google_oauth_token_expires_at timestamptz,
+          google_oauth_scopes          text[] NOT NULL DEFAULT '{}',
+          google_calendar_connected    boolean NOT NULL DEFAULT false,
+
+          -- Booking configuration
+          minimum_notice_hours  integer NOT NULL DEFAULT 24 CHECK (minimum_notice_hours >= 0),
+
+          created_at  timestamptz NOT NULL DEFAULT now(),
+          updated_at  timestamptz NOT NULL DEFAULT now()
+        );
+
+        -- Enable RLS
+        ALTER TABLE therapists ENABLE ROW LEVEL SECURITY;
+
+        COMMENT ON TABLE therapists IS 'Therapist profile and practice configuration. RLS: own-row access only.';
+        COMMENT ON COLUMN therapists.google_oauth_access_token IS 'ENCRYPTED -- Google OAuth access token';
+        COMMENT ON COLUMN therapists.google_oauth_refresh_token IS 'ENCRYPTED -- Google OAuth refresh token';
+      deployment_dependency: "Deploy before application code"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 2: services (FK -> therapists)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create services table -- appointment types offered by therapists.
+        FK to therapists with ON DELETE CASCADE (therapist deletion removes services).
+      sql: |
+        CREATE TABLE services (
+          id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          therapist_id    uuid NOT NULL REFERENCES therapists(id) ON DELETE CASCADE,
+          name            text NOT NULL,
+          description     text,  -- optional
+          duration_minutes integer NOT NULL CHECK (duration_minutes >= 15),
+          modality        text NOT NULL CHECK (modality IN ('online', 'in_person')),
+          is_active       boolean NOT NULL DEFAULT true,
+          created_at      timestamptz NOT NULL DEFAULT now(),
+          updated_at      timestamptz NOT NULL DEFAULT now()
+        );
+
+        ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+
+        COMMENT ON TABLE services IS 'Appointment types offered by a therapist. RLS: therapist CRUD own; public read active.';
+      deployment_dependency: "After therapists table created"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 3: availability (FK -> therapists)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create availability table -- weekly time blocks for bookable hours.
+        FK to therapists with ON DELETE CASCADE.
+        day_of_week: 0=Sunday..6=Saturday.
+        Overlap prevention enforced at application layer + exclusion constraint.
+      sql: |
+        CREATE TABLE availability (
+          id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          therapist_id    uuid NOT NULL REFERENCES therapists(id) ON DELETE CASCADE,
+          day_of_week     integer NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+          start_time      time NOT NULL,
+          end_time        time NOT NULL,
+          created_at      timestamptz NOT NULL DEFAULT now(),
+          updated_at      timestamptz NOT NULL DEFAULT now(),
+
+          CONSTRAINT availability_time_order CHECK (end_time > start_time)
+        );
+
+        ALTER TABLE availability ENABLE ROW LEVEL SECURITY;
+
+        -- Exclusion constraint to prevent overlapping time blocks on the same day
+        -- Requires btree_gist extension for combining equality with range exclusion
+        CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+        ALTER TABLE availability ADD CONSTRAINT availability_no_overlap
+          EXCLUDE USING gist (
+            therapist_id WITH =,
+            day_of_week WITH =,
+            timerange(start_time, end_time) WITH &&
+          );
+
+        COMMENT ON TABLE availability IS 'Weekly time blocks defining when a therapist is bookable. RLS: therapist CRUD own; public read for slot computation.';
+      deployment_dependency: "After therapists table created"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 4: bookings (FK -> therapists, services)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create bookings table -- core appointment records.
+        FK to therapists (no cascade -- bookings must survive independently).
+        FK to services with ON DELETE RESTRICT (cannot delete service with existing bookings).
+        manage_token is unique for client self-service access.
+      sql: |
+        CREATE TABLE bookings (
+          id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          therapist_id        uuid NOT NULL REFERENCES therapists(id),
+          service_id          uuid NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+          client_name         text NOT NULL,
+          client_email        text NOT NULL,
+          client_phone        text NOT NULL,
+          client_consent      boolean NOT NULL CHECK (client_consent = true),
+          start_time          timestamptz NOT NULL,
+          end_time            timestamptz NOT NULL,
+          status              text NOT NULL DEFAULT 'confirmed'
+                              CHECK (status IN ('confirmed', 'cancelled', 'completed')),
+          modality            text NOT NULL CHECK (modality IN ('online', 'in_person')),
+          meet_link           text,  -- populated for online bookings after GCal sync
+          manage_token        text UNIQUE NOT NULL,  -- tokenized link for client self-service
+          manage_token_expires_at timestamptz,  -- design gate: token expiry policy
+          cancellation_reason text,
+          created_by          text NOT NULL,  -- 'client' or therapist UUID
+          created_at          timestamptz NOT NULL DEFAULT now(),
+          updated_at          timestamptz NOT NULL DEFAULT now(),
+
+          CONSTRAINT bookings_time_order CHECK (end_time > start_time)
+        );
+
+        ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+
+        COMMENT ON TABLE bookings IS 'Core booking entity -- client appointments with therapists. RLS: therapist r/w own; public insert scoped; client via manage_token.';
+        COMMENT ON COLUMN bookings.client_phone IS 'PHI-adjacent -- never logged, never included in emails';
+        COMMENT ON COLUMN bookings.manage_token IS 'Unique token for client self-service reschedule/cancel';
+      deployment_dependency: "After therapists and services tables created"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 5: booking_audit_log (references entity_id, not strict FK)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create booking_audit_log table -- immutable append-only audit trail.
+        Uses entity_type + entity_id pattern (polymorphic) rather than strict FK
+        to support auditing across multiple entity types.
+        INSERT only -- no UPDATE or DELETE permitted (enforced via RLS + trigger).
+      sql: |
+        CREATE TABLE booking_audit_log (
+          id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          entity_type     text NOT NULL,  -- 'booking', 'service', 'availability', 'therapist', 'gcal_event'
+          entity_id       uuid NOT NULL,
+          action          text NOT NULL,  -- e.g. 'booking.created', 'service.updated', 'gcal.event.created'
+          actor           text NOT NULL,  -- therapist UUID, 'client:{email_hash}', or 'system'
+          before_state    jsonb,
+          after_state     jsonb,
+          metadata        jsonb,  -- extra context (e.g. scopes granted, error details)
+          created_at      timestamptz NOT NULL DEFAULT now()
+        );
+
+        ALTER TABLE booking_audit_log ENABLE ROW LEVEL SECURITY;
+
+        -- Immutability trigger: block UPDATE and DELETE at the database level
+        CREATE OR REPLACE FUNCTION prevent_audit_log_mutation()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          RAISE EXCEPTION 'booking_audit_log is immutable: % operations are not permitted', TG_OP;
+          RETURN NULL;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER audit_log_no_update
+          BEFORE UPDATE ON booking_audit_log
+          FOR EACH ROW
+          EXECUTE FUNCTION prevent_audit_log_mutation();
+
+        CREATE TRIGGER audit_log_no_delete
+          BEFORE DELETE ON booking_audit_log
+          FOR EACH ROW
+          EXECUTE FUNCTION prevent_audit_log_mutation();
+
+        COMMENT ON TABLE booking_audit_log IS 'Immutable audit log. INSERT only -- UPDATE/DELETE blocked by trigger + RLS. PHI minimization: hashed emails, no phone numbers.';
+      deployment_dependency: "After therapists table created (for actor references)"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 6: slot_locks (FK -> therapists)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create slot_locks table -- temporary holds on time slots during booking flow.
+        Partial unique index prevents concurrent locks on the same slot.
+        Expired locks are treated as non-existent during slot computation.
+      sql: |
+        CREATE TABLE slot_locks (
+          id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          therapist_id    uuid NOT NULL REFERENCES therapists(id) ON DELETE CASCADE,
+          start_time      timestamptz NOT NULL,
+          end_time        timestamptz NOT NULL,
+          locked_by       text NOT NULL,  -- session or client identifier
+          expires_at      timestamptz NOT NULL,
+          created_at      timestamptz NOT NULL DEFAULT now(),
+
+          CONSTRAINT slot_locks_time_order CHECK (end_time > start_time)
+        );
+
+        ALTER TABLE slot_locks ENABLE ROW LEVEL SECURITY;
+
+        -- Partial unique index: prevent concurrent active locks on the same slot
+        CREATE UNIQUE INDEX idx_slot_locks_active_unique
+          ON slot_locks (therapist_id, start_time, end_time)
+          WHERE expires_at > now();
+
+        COMMENT ON TABLE slot_locks IS 'Temporary slot holds to prevent double-booking. Expired locks filtered at query time.';
+      deployment_dependency: "After therapists table created"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 7: google_calendar_events (FK -> bookings, therapists)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create google_calendar_events table -- references to GCal events.
+        booking_id is UNIQUE (one GCal event per booking).
+        Stores references only, not event duplicates.
+      sql: |
+        CREATE TABLE google_calendar_events (
+          id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          booking_id          uuid UNIQUE NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+          therapist_id        uuid NOT NULL REFERENCES therapists(id),
+          google_event_id     text NOT NULL,
+          google_calendar_id  text NOT NULL DEFAULT 'primary',
+          meet_link           text,  -- for online modality
+          sync_status         text NOT NULL DEFAULT 'pending'
+                              CHECK (sync_status IN ('synced', 'pending', 'failed')),
+          last_sync_error     text,
+          last_synced_at      timestamptz,
+          created_at          timestamptz NOT NULL DEFAULT now(),
+          updated_at          timestamptz NOT NULL DEFAULT now()
+        );
+
+        ALTER TABLE google_calendar_events ENABLE ROW LEVEL SECURITY;
+
+        COMMENT ON TABLE google_calendar_events IS 'GCal event references. Google Calendar is SoR for the event; Curio is SoR for the booking.';
+      deployment_dependency: "After bookings and therapists tables created"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 8: notification_log (FK -> bookings, therapists)
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create notification_log table -- tracks email notifications.
+        recipient_email_hash stores hashed (not plaintext) email for PHI minimization.
+        Reminders for cancelled bookings must be suppressed (status='suppressed').
+      sql: |
+        CREATE TABLE notification_log (
+          id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          booking_id          uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+          therapist_id        uuid NOT NULL REFERENCES therapists(id),
+          notification_type   text NOT NULL,  -- 'confirmation', 'reschedule', 'cancellation', 'reminder_24h', 'reminder_1h'
+          recipient_type      text NOT NULL,  -- 'client' or 'therapist'
+          recipient_email_hash text NOT NULL,  -- hashed, not plaintext
+          status              text NOT NULL DEFAULT 'pending'
+                              CHECK (status IN ('sent', 'failed', 'pending', 'suppressed')),
+          resend_message_id   text,  -- Resend API response ID
+          error_message       text,
+          retry_count         integer NOT NULL DEFAULT 0,
+          scheduled_for       timestamptz,  -- for reminders
+          sent_at             timestamptz,
+          created_at          timestamptz NOT NULL DEFAULT now()
+        );
+
+        ALTER TABLE notification_log ENABLE ROW LEVEL SECURITY;
+
+        COMMENT ON TABLE notification_log IS 'Email notification tracking. PHI minimized: hashed recipient, no email body stored.';
+      deployment_dependency: "After bookings and therapists tables created"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 9: RLS policies for all tables
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Apply Row Level Security policies to all 8 tables.
+        RLS is non-negotiable per HIPAA/PHIPA compliance requirements.
+        Policies enforce tenant isolation using auth.uid() = therapist_id (or id for therapists).
+      sql: |
+        -- =====================================================
+        -- THERAPISTS -- own-row access only
+        -- =====================================================
+        CREATE POLICY "therapists_select_own"
+          ON therapists FOR SELECT
+          USING (id = auth.uid());
+
+        CREATE POLICY "therapists_update_own"
+          ON therapists FOR UPDATE
+          USING (id = auth.uid())
+          WITH CHECK (id = auth.uid());
+
+        -- Insert handled by auth trigger / server-side only
+        CREATE POLICY "therapists_insert_own"
+          ON therapists FOR INSERT
+          WITH CHECK (id = auth.uid());
+
+        -- =====================================================
+        -- SERVICES -- therapist CRUD own; anon read active
+        -- =====================================================
+        CREATE POLICY "services_select_own"
+          ON services FOR SELECT
+          USING (therapist_id = auth.uid());
+
+        CREATE POLICY "services_select_public_active"
+          ON services FOR SELECT
+          TO anon
+          USING (is_active = true);
+
+        CREATE POLICY "services_insert_own"
+          ON services FOR INSERT
+          WITH CHECK (therapist_id = auth.uid());
+
+        CREATE POLICY "services_update_own"
+          ON services FOR UPDATE
+          USING (therapist_id = auth.uid())
+          WITH CHECK (therapist_id = auth.uid());
+
+        CREATE POLICY "services_delete_own"
+          ON services FOR DELETE
+          USING (therapist_id = auth.uid());
+
+        -- =====================================================
+        -- AVAILABILITY -- therapist CRUD own; anon read for slot computation
+        -- =====================================================
+        CREATE POLICY "availability_select_own"
+          ON availability FOR SELECT
+          USING (therapist_id = auth.uid());
+
+        CREATE POLICY "availability_select_public"
+          ON availability FOR SELECT
+          TO anon
+          USING (true);
+          -- Public read is required for booking page slot computation.
+          -- Availability data is non-PHI (days/hours only).
+          -- Scoped to specific therapist via application query (WHERE therapist_id = ?).
+
+        CREATE POLICY "availability_insert_own"
+          ON availability FOR INSERT
+          WITH CHECK (therapist_id = auth.uid());
+
+        CREATE POLICY "availability_update_own"
+          ON availability FOR UPDATE
+          USING (therapist_id = auth.uid())
+          WITH CHECK (therapist_id = auth.uid());
+
+        CREATE POLICY "availability_delete_own"
+          ON availability FOR DELETE
+          USING (therapist_id = auth.uid());
+
+        -- =====================================================
+        -- BOOKINGS -- therapist r/w own; anon insert scoped; client via manage_token
+        -- =====================================================
+        CREATE POLICY "bookings_select_own"
+          ON bookings FOR SELECT
+          USING (therapist_id = auth.uid());
+
+        -- Anon select for client access via manage_token
+        CREATE POLICY "bookings_select_by_token"
+          ON bookings FOR SELECT
+          TO anon
+          USING (manage_token = current_setting('request.headers', true)::json->>'x-manage-token');
+          -- Client access scoped to single booking via manage_token header.
+          -- Implementation note: may use RPC function instead if header approach is impractical.
+
+        -- Anon insert for public booking creation (service_role or Edge Function may be needed)
+        CREATE POLICY "bookings_insert_public"
+          ON bookings FOR INSERT
+          TO anon
+          WITH CHECK (true);
+          -- Booking creation is public (no auth required).
+          -- Scoping to valid therapist enforced by FK constraint on therapist_id.
+          -- Application validates all required fields before insert.
+
+        CREATE POLICY "bookings_update_own"
+          ON bookings FOR UPDATE
+          USING (therapist_id = auth.uid())
+          WITH CHECK (therapist_id = auth.uid());
+
+        -- Anon update for client reschedule/cancel via manage_token
+        CREATE POLICY "bookings_update_by_token"
+          ON bookings FOR UPDATE
+          TO anon
+          USING (manage_token = current_setting('request.headers', true)::json->>'x-manage-token')
+          WITH CHECK (manage_token = current_setting('request.headers', true)::json->>'x-manage-token');
+
+        -- No DELETE policy -- bookings are cancelled (status change), not deleted
+
+        -- =====================================================
+        -- BOOKING_AUDIT_LOG -- therapist reads own; insert-only
+        -- =====================================================
+        -- Read: therapist can read audit logs for their own entities
+        CREATE POLICY "audit_log_select_own"
+          ON booking_audit_log FOR SELECT
+          USING (
+            entity_id IN (
+              SELECT id FROM therapists WHERE id = auth.uid()
+            )
+            OR entity_id IN (
+              SELECT id FROM bookings WHERE therapist_id = auth.uid()
+            )
+            OR entity_id IN (
+              SELECT id FROM services WHERE therapist_id = auth.uid()
+            )
+            OR entity_id IN (
+              SELECT id FROM availability WHERE therapist_id = auth.uid()
+            )
+            OR actor = auth.uid()::text
+          );
+
+        -- Insert: system and authenticated users (server-side inserts)
+        -- In practice, audit log inserts happen via server-side code (Edge Functions / Server Actions)
+        -- using the service_role key, not direct client inserts.
+        CREATE POLICY "audit_log_insert_service"
+          ON booking_audit_log FOR INSERT
+          WITH CHECK (true);
+          -- INSERT is permitted; immutability enforced by triggers blocking UPDATE/DELETE.
+
+        -- No UPDATE or DELETE policies (trigger blocks these operations regardless)
+
+        -- =====================================================
+        -- SLOT_LOCKS -- public insert scoped; system cleanup
+        -- =====================================================
+        CREATE POLICY "slot_locks_select_public"
+          ON slot_locks FOR SELECT
+          TO anon
+          USING (true);
+          -- Public read for slot computation (check if slot is locked).
+
+        CREATE POLICY "slot_locks_select_own"
+          ON slot_locks FOR SELECT
+          USING (therapist_id = auth.uid());
+
+        CREATE POLICY "slot_locks_insert_public"
+          ON slot_locks FOR INSERT
+          TO anon
+          WITH CHECK (true);
+          -- Public insert for clients locking a slot during booking flow.
+
+        CREATE POLICY "slot_locks_delete_expired"
+          ON slot_locks FOR DELETE
+          USING (expires_at <= now());
+          -- Allow cleanup of expired locks.
+          -- Active lock deletion restricted to service_role (server-side).
+
+        -- =====================================================
+        -- GOOGLE_CALENDAR_EVENTS -- therapist reads own; system writes
+        -- =====================================================
+        CREATE POLICY "gcal_events_select_own"
+          ON google_calendar_events FOR SELECT
+          USING (therapist_id = auth.uid());
+
+        -- Insert/Update via service_role (Edge Functions handle GCal sync)
+        CREATE POLICY "gcal_events_insert_service"
+          ON google_calendar_events FOR INSERT
+          WITH CHECK (true);
+
+        CREATE POLICY "gcal_events_update_service"
+          ON google_calendar_events FOR UPDATE
+          USING (true)
+          WITH CHECK (true);
+          -- GCal sync is server-side only (service_role).
+          -- These permissive policies are safe because client-side code
+          -- never directly inserts/updates this table (no client API exposed).
+
+        -- =====================================================
+        -- NOTIFICATION_LOG -- therapist reads own; system writes
+        -- =====================================================
+        CREATE POLICY "notification_log_select_own"
+          ON notification_log FOR SELECT
+          USING (therapist_id = auth.uid());
+
+        CREATE POLICY "notification_log_insert_service"
+          ON notification_log FOR INSERT
+          WITH CHECK (true);
+
+        CREATE POLICY "notification_log_update_service"
+          ON notification_log FOR UPDATE
+          USING (true)
+          WITH CHECK (true);
+          -- Notification dispatch is server-side only (service_role).
+      deployment_dependency: "After all tables created (phases 1-8)"
+      estimated_duration: "< 1s"
+      blocking: false
+      requires_approval: false
+
+    # ----------------------------------------------------------
+    # Phase 10: Indexes for common query patterns
+    # ----------------------------------------------------------
+    - phase: expand
+      description: >
+        Create indexes for common query patterns across all tables.
+        All indexes are additive and non-blocking on empty tables.
+      sql: |
+        -- THERAPISTS
+        -- slug lookup for booking page URL resolution
+        -- (Already UNIQUE, index created implicitly)
+        -- google_id lookup for OAuth login
+        -- (Already UNIQUE, index created implicitly)
+
+        -- SERVICES
+        -- Therapist's service list (filtered by active)
+        CREATE INDEX idx_services_therapist_active
+          ON services (therapist_id, is_active)
+          WHERE is_active = true;
+
+        -- AVAILABILITY
+        -- Therapist's availability by day
+        CREATE INDEX idx_availability_therapist_day
+          ON availability (therapist_id, day_of_week);
+
+        -- BOOKINGS
+        -- Therapist's bookings by status and time (dashboard queries)
+        CREATE INDEX idx_bookings_therapist_status_time
+          ON bookings (therapist_id, status, start_time);
+
+        -- Slot availability check (confirmed bookings that overlap a time range)
+        CREATE INDEX idx_bookings_therapist_time_confirmed
+          ON bookings (therapist_id, start_time, end_time)
+          WHERE status = 'confirmed';
+
+        -- Manage token lookup (client self-service)
+        -- (manage_token is UNIQUE, index created implicitly)
+
+        -- Service reference for booking queries
+        CREATE INDEX idx_bookings_service
+          ON bookings (service_id);
+
+        -- BOOKING_AUDIT_LOG
+        -- Entity lookup (view audit trail for a specific entity)
+        CREATE INDEX idx_audit_log_entity
+          ON booking_audit_log (entity_type, entity_id, created_at DESC);
+
+        -- Actor lookup (view actions by a specific actor)
+        CREATE INDEX idx_audit_log_actor
+          ON booking_audit_log (actor, created_at DESC);
+
+        -- SLOT_LOCKS
+        -- Active lock check during slot computation
+        CREATE INDEX idx_slot_locks_active
+          ON slot_locks (therapist_id, start_time, end_time)
+          WHERE expires_at > now();
+
+        -- Cleanup of expired locks
+        CREATE INDEX idx_slot_locks_expires
+          ON slot_locks (expires_at)
+          WHERE expires_at <= now();
+
+        -- GOOGLE_CALENDAR_EVENTS
+        -- Booking lookup (one-to-one)
+        -- (booking_id is UNIQUE, index created implicitly)
+
+        -- Sync status for retry processing
+        CREATE INDEX idx_gcal_events_sync_status
+          ON google_calendar_events (sync_status)
+          WHERE sync_status IN ('pending', 'failed');
+
+        -- NOTIFICATION_LOG
+        -- Booking notifications lookup
+        CREATE INDEX idx_notification_log_booking
+          ON notification_log (booking_id, notification_type);
+
+        -- Pending/scheduled reminders for cron processing
+        CREATE INDEX idx_notification_log_pending_scheduled
+          ON notification_log (scheduled_for, status)
+          WHERE status = 'pending' AND scheduled_for IS NOT NULL;
+
+        -- Therapist notification history
+        CREATE INDEX idx_notification_log_therapist
+          ON notification_log (therapist_id, created_at DESC);
+
+        -- updated_at auto-update function (shared by all tables with updated_at)
+        CREATE OR REPLACE FUNCTION update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = now();
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        -- Apply updated_at triggers to all tables that have the column
+        CREATE TRIGGER set_updated_at BEFORE UPDATE ON therapists
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+        CREATE TRIGGER set_updated_at BEFORE UPDATE ON services
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+        CREATE TRIGGER set_updated_at BEFORE UPDATE ON availability
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+        CREATE TRIGGER set_updated_at BEFORE UPDATE ON bookings
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+        CREATE TRIGGER set_updated_at BEFORE UPDATE ON google_calendar_events
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      deployment_dependency: "After all tables and RLS policies applied"
+      estimated_duration: "< 1s (empty tables)"
+      blocking: false
+      requires_approval: false
+
+  # ============================================================
+  # DATA BACKFILL
+  # ============================================================
+  data_backfill:
+    required: false
+    notes:
+      - "Greenfield build -- no existing data to backfill"
+      - "All tables start empty; data populated by application at runtime"
+
+  # ============================================================
+  # RISK ASSESSMENT
+  # ============================================================
+  risk:
+    level: low
+    data_volume: "0 rows (greenfield)"
+    downtime_impact: "None -- all operations are additive CREATE TABLE / CREATE INDEX"
+    notes:
+      - "Greenfield schema creation -- all operations are additive, zero downtime"
+      - "No existing data at risk"
+      - "RLS policy correctness is CRITICAL -- incorrect policies could expose PHI across tenants (HIPAA/PHIPA violation)"
+      - "FK cascade behavior must be carefully verified:"
+      - "  - therapists -> services: ON DELETE CASCADE (removing therapist removes their services)"
+      - "  - therapists -> availability: ON DELETE CASCADE"
+      - "  - therapists -> slot_locks: ON DELETE CASCADE"
+      - "  - services -> bookings: ON DELETE RESTRICT (cannot delete service with existing bookings)"
+      - "  - bookings -> google_calendar_events: ON DELETE CASCADE (removing booking removes GCal reference)"
+      - "  - bookings -> notification_log: ON DELETE CASCADE (removing booking removes notification records)"
+      - "  - therapists -> bookings: no cascade (bookings reference therapist but therapist deletion should be a deliberate operation)"
+      - "Audit log immutability enforced via database triggers (not just RLS) -- trigger-level enforcement is stronger"
+      - "Partial unique index on slot_locks uses WHERE expires_at > now() -- this is a volatile expression; lock uniqueness is best-effort and must be complemented by application-level checks"
+      - "btree_gist extension required for availability overlap exclusion constraint -- verify extension is available in Supabase project"
+      - "PHI minimization: notification_log stores recipient_email_hash (not plaintext), audit_log uses hashed emails in actor field for client actions"
+      - "OAuth tokens (access_token, refresh_token) are PHI-adjacent secrets -- must confirm Supabase project has column-level encryption or vault configured"
+
+  # ============================================================
+  # ROLLBACK PROCEDURE
+  # ============================================================
+  rollback:
+    automated: true
+    notes:
+      - "Greenfield rollback is straightforward: DROP tables in reverse FK dependency order"
+      - "No data loss concern (tables are empty at migration time)"
+      - "If rollback is needed after data has been written, data will be lost -- take a backup first"
+    steps:
+      - phase: expand
+        action: |
+          -- Reverse order: drop dependent tables first, then parent tables
+          -- Phase 10 rollback: drop indexes (implicit with table drops)
+          -- Phase 9 rollback: drop RLS policies (implicit with table drops)
+
+          -- Drop triggers and functions
+          DROP TRIGGER IF EXISTS set_updated_at ON google_calendar_events;
+          DROP TRIGGER IF EXISTS set_updated_at ON bookings;
+          DROP TRIGGER IF EXISTS set_updated_at ON availability;
+          DROP TRIGGER IF EXISTS set_updated_at ON services;
+          DROP TRIGGER IF EXISTS set_updated_at ON therapists;
+          DROP FUNCTION IF EXISTS update_updated_at_column();
+
+          DROP TRIGGER IF EXISTS audit_log_no_delete ON booking_audit_log;
+          DROP TRIGGER IF EXISTS audit_log_no_update ON booking_audit_log;
+          DROP FUNCTION IF EXISTS prevent_audit_log_mutation();
+
+          -- Phase 8: Drop notification_log (FK -> bookings, therapists)
+          DROP TABLE IF EXISTS notification_log CASCADE;
+
+          -- Phase 7: Drop google_calendar_events (FK -> bookings, therapists)
+          DROP TABLE IF EXISTS google_calendar_events CASCADE;
+
+          -- Phase 6: Drop slot_locks (FK -> therapists)
+          DROP TABLE IF EXISTS slot_locks CASCADE;
+
+          -- Phase 5: Drop booking_audit_log (no strict FK)
+          DROP TABLE IF EXISTS booking_audit_log CASCADE;
+
+          -- Phase 4: Drop bookings (FK -> therapists, services)
+          DROP TABLE IF EXISTS bookings CASCADE;
+
+          -- Phase 3: Drop availability (FK -> therapists)
+          DROP TABLE IF EXISTS availability CASCADE;
+
+          -- Phase 2: Drop services (FK -> therapists)
+          DROP TABLE IF EXISTS services CASCADE;
+
+          -- Phase 1: Drop therapists (root table)
+          DROP TABLE IF EXISTS therapists CASCADE;
+
+          -- Drop extension if no longer needed
+          -- DROP EXTENSION IF EXISTS btree_gist;
+          -- (Keep btree_gist; it may be used by other Supabase features)
+        data_loss_risk: "none (if tables are empty) / full (if data has been written)"
+        notes: >
+          Safe for greenfield rollback before any data is written.
+          If data exists, take a pg_dump backup before executing rollback.
+
+# ============================================================
+# SUPABASE-SPECIFIC CONFIGURATION
+# ============================================================
+supabase:
+  migration_files:
+    - "20260206000001_create_therapists.sql"
+    - "20260206000002_create_services.sql"
+    - "20260206000003_create_availability.sql"
+    - "20260206000004_create_bookings.sql"
+    - "20260206000005_create_booking_audit_log.sql"
+    - "20260206000006_create_slot_locks.sql"
+    - "20260206000007_create_google_calendar_events.sql"
+    - "20260206000008_create_notification_log.sql"
+    - "20260206000009_apply_rls_policies.sql"
+    - "20260206000010_create_indexes_and_triggers.sql"
+  notes:
+    - "Each phase maps to a separate migration file for incremental deployment"
+    - "Migration files should be generated from the SQL in each phase above"
+    - "Run via: supabase db push (development) or automatic on git push (production)"
+    - "btree_gist extension must be enabled in the Supabase project (Dashboard > Database > Extensions)"
+
+  rls_changes:
+    - table: therapists
+      policies:
+        - "therapists_select_own: SELECT WHERE id = auth.uid()"
+        - "therapists_update_own: UPDATE WHERE id = auth.uid()"
+        - "therapists_insert_own: INSERT WHERE id = auth.uid()"
+
+    - table: services
+      policies:
+        - "services_select_own: SELECT WHERE therapist_id = auth.uid()"
+        - "services_select_public_active: SELECT (anon) WHERE is_active = true"
+        - "services_insert_own: INSERT WHERE therapist_id = auth.uid()"
+        - "services_update_own: UPDATE WHERE therapist_id = auth.uid()"
+        - "services_delete_own: DELETE WHERE therapist_id = auth.uid()"
+
+    - table: availability
+      policies:
+        - "availability_select_own: SELECT WHERE therapist_id = auth.uid()"
+        - "availability_select_public: SELECT (anon) all rows (non-PHI schedule data)"
+        - "availability_insert_own: INSERT WHERE therapist_id = auth.uid()"
+        - "availability_update_own: UPDATE WHERE therapist_id = auth.uid()"
+        - "availability_delete_own: DELETE WHERE therapist_id = auth.uid()"
+
+    - table: bookings
+      policies:
+        - "bookings_select_own: SELECT WHERE therapist_id = auth.uid()"
+        - "bookings_select_by_token: SELECT (anon) WHERE manage_token matches header"
+        - "bookings_insert_public: INSERT (anon) for public booking creation"
+        - "bookings_update_own: UPDATE WHERE therapist_id = auth.uid()"
+        - "bookings_update_by_token: UPDATE (anon) WHERE manage_token matches header"
+
+    - table: booking_audit_log
+      policies:
+        - "audit_log_select_own: SELECT WHERE entity belongs to auth.uid()"
+        - "audit_log_insert_service: INSERT (permissive, server-side only in practice)"
+        - "No UPDATE/DELETE policies (trigger-enforced immutability)"
+
+    - table: slot_locks
+      policies:
+        - "slot_locks_select_public: SELECT (anon) for slot computation"
+        - "slot_locks_select_own: SELECT WHERE therapist_id = auth.uid()"
+        - "slot_locks_insert_public: INSERT (anon) for client slot locking"
+        - "slot_locks_delete_expired: DELETE WHERE expires_at <= now()"
+
+    - table: google_calendar_events
+      policies:
+        - "gcal_events_select_own: SELECT WHERE therapist_id = auth.uid()"
+        - "gcal_events_insert_service: INSERT (server-side via service_role)"
+        - "gcal_events_update_service: UPDATE (server-side via service_role)"
+
+    - table: notification_log
+      policies:
+        - "notification_log_select_own: SELECT WHERE therapist_id = auth.uid()"
+        - "notification_log_insert_service: INSERT (server-side via service_role)"
+        - "notification_log_update_service: UPDATE (server-side via service_role)"
+
+# ============================================================
+# INDEXES
+# ============================================================
+indexes:
+  new:
+    - table: services
+      columns: ["therapist_id", "is_active"]
+      type: btree
+      partial: "WHERE is_active = true"
+      purpose: "Active service list for booking page"
+
+    - table: availability
+      columns: ["therapist_id", "day_of_week"]
+      type: btree
+      purpose: "Availability lookup by therapist and day"
+
+    - table: bookings
+      columns: ["therapist_id", "status", "start_time"]
+      type: btree
+      purpose: "Therapist dashboard booking list"
+
+    - table: bookings
+      columns: ["therapist_id", "start_time", "end_time"]
+      type: btree
+      partial: "WHERE status = 'confirmed'"
+      purpose: "Slot availability check (confirmed bookings overlap)"
+
+    - table: bookings
+      columns: ["service_id"]
+      type: btree
+      purpose: "Service reference for booking queries"
+
+    - table: booking_audit_log
+      columns: ["entity_type", "entity_id", "created_at DESC"]
+      type: btree
+      purpose: "Audit trail per entity"
+
+    - table: booking_audit_log
+      columns: ["actor", "created_at DESC"]
+      type: btree
+      purpose: "Audit trail per actor"
+
+    - table: slot_locks
+      columns: ["therapist_id", "start_time", "end_time"]
+      type: btree
+      partial: "WHERE expires_at > now()"
+      purpose: "Active lock check during slot computation"
+
+    - table: slot_locks
+      columns: ["expires_at"]
+      type: btree
+      partial: "WHERE expires_at <= now()"
+      purpose: "Cleanup of expired locks"
+
+    - table: google_calendar_events
+      columns: ["sync_status"]
+      type: btree
+      partial: "WHERE sync_status IN ('pending', 'failed')"
+      purpose: "Retry processing for failed syncs"
+
+    - table: notification_log
+      columns: ["booking_id", "notification_type"]
+      type: btree
+      purpose: "Booking notification lookup"
+
+    - table: notification_log
+      columns: ["scheduled_for", "status"]
+      type: btree
+      partial: "WHERE status = 'pending' AND scheduled_for IS NOT NULL"
+      purpose: "Pending reminder cron processing"
+
+    - table: notification_log
+      columns: ["therapist_id", "created_at DESC"]
+      type: btree
+      purpose: "Therapist notification history"
+
+# ============================================================
+# DESIGN DECISIONS & NOTES
+# ============================================================
+design_decisions:
+  - decision: "services.service_id FK uses ON DELETE RESTRICT (not SET NULL)"
+    rationale: >
+      system-design.yaml notes: "existing bookings must survive service deletion".
+      RESTRICT prevents accidental deletion of services with bookings.
+      The is_active flag on services provides soft-delete functionality
+      for hiding services from the booking page without breaking FK integrity.
+      If a therapist needs to remove a service with bookings, they deactivate it (is_active=false).
+
+  - decision: "bookings.therapist_id FK has no cascade"
+    rationale: >
+      Therapist deletion is a rare, high-impact operation that should be
+      handled by an explicit admin process, not automated cascades.
+      Bookings contain client PHI and must be preserved or explicitly
+      cleaned up per data retention policy.
+
+  - decision: "booking_audit_log uses polymorphic entity_type/entity_id (no strict FK)"
+    rationale: >
+      The audit log covers multiple entity types (bookings, services, availability,
+      therapists, gcal_events). A polymorphic pattern avoids a tangle of nullable
+      FKs and allows the log to grow independently. The trade-off is no FK integrity
+      on entity_id; this is acceptable because the audit log is append-only and
+      referential integrity is enforced at the application layer.
+
+  - decision: "Anon booking policies use permissive INSERT"
+    rationale: >
+      Public booking creation requires anon INSERT on bookings and slot_locks.
+      The RLS policies are permissive because field validation is enforced by
+      CHECK constraints (client_consent = true, status IN (...), modality IN (...))
+      and NOT NULL constraints. The therapist_id FK constraint ensures the booking
+      references a valid therapist. For additional security, booking creation should
+      route through a server-side Edge Function or Server Action using service_role,
+      rather than direct client-side inserts.
+
+  - decision: "Client booking access via manage_token in request header"
+    rationale: >
+      RLS policy for client booking access uses current_setting to read a custom
+      header (x-manage-token). This is a starting approach; implementation may
+      prefer an RPC function that accepts the token as a parameter, which is
+      more testable and avoids header-passing complexity. The RLS policy may
+      need refinement during implementation.
+
+  - decision: "Availability overlap exclusion constraint uses btree_gist"
+    rationale: >
+      Postgres exclusion constraints with GiST indexes are the most reliable way
+      to enforce non-overlapping time ranges at the database level. The btree_gist
+      extension must be enabled in the Supabase project. This provides a
+      defense-in-depth layer alongside application-level validation.

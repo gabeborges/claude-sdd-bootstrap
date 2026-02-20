@@ -1,0 +1,89 @@
+# Booking Services -- Tasks
+# Feature: booking-services
+# Spec: .ops/build/v0/booking-services/specs.md
+# Generated: 2026-02-06
+
+- id: T-BS-001
+  title: "Create services table migration (DB phase 2)"
+  implements: "booking-services/R4, booking-services/R5, booking-services/R7, booking-services/R13"
+  status: pending
+  tier: db
+  acceptance: >
+    services table created per db-migration-plan.yaml phase 2 SQL.
+    Columns match system-design.yaml: id, therapist_id (FK), name, description,
+    duration_minutes (CHECK >= 15), modality (CHECK IN online/in_person), is_active, timestamps.
+    RLS enabled. FK to therapists with ON DELETE CASCADE.
+    Migration file: 20260206000002_create_services.sql.
+  depends_on:
+    - T-TS-001
+
+- id: T-BS-002
+  title: "Apply RLS policies for services table (DB phase 9 -- services portion)"
+  implements: "booking-services/R4, booking-services/R5, booking-services/R10"
+  status: pending
+  tier: db
+  acceptance: >
+    services_select_own, services_select_public_active (anon, WHERE is_active=true),
+    services_insert_own, services_update_own, services_delete_own policies applied.
+    Therapist CRUD restricted to own services. Anon can read active services only.
+    Verified via SQL assertion or Supabase test.
+  depends_on:
+    - T-BS-001
+
+- id: T-BS-003
+  title: "Implement service CRUD Server Actions (create, read, update, delete)"
+  implements: "booking-services/R1, booking-services/R2, booking-services/R3, booking-services/R6, booking-services/R8, booking-services/R9, booking-services/R11, booking-services/R12"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Actions for: createService, updateService, deleteService, getServices.
+    Validation: name non-empty, duration >= 15 min, modality in (online, in_person).
+    Deletion uses soft-deactivate (is_active=false) to preserve existing bookings.
+    Each operation emits audit log entry with before/after state for updates.
+    Modality flag stored and propagated (online triggers Meet link in GCal sync).
+    RLS enforced at DB level; no application-level-only auth bypass.
+  depends_on:
+    - T-BS-001
+    - T-BS-002
+    - T-TS-004
+
+- id: T-BS-004
+  title: "Build service management UI (CRUD form and service list)"
+  implements: "booking-services/R1, booking-services/R2, booking-services/R3, booking-services/R10, booking-services/R14, booking-services/S1, booking-services/S2, booking-services/S3, booking-services/S4, booking-services/S5, booking-services/S7, booking-services/S8, booking-services/S9"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Service management page with: list of services, create form, edit form, delete action.
+    Form fields: name (text), duration (number, min 15), modality (radio/select: online/in-person),
+    description (textarea, optional).
+    Validation errors shown for empty name, invalid duration.
+    Delete shows confirmation. Existing bookings preserved on delete.
+    Service list shows active/inactive status.
+    All elements keyboard-navigable, screen reader accessible, WCAG compliant.
+  depends_on:
+    - T-BS-003
+
+- id: T-BS-005
+  title: "Write tests for service CRUD operations"
+  implements: "booking-services/S1, booking-services/S2, booking-services/S3, booking-services/S4, booking-services/S5, booking-services/S6, booking-services/S7, booking-services/S8"
+  status: pending
+  tier: test
+  acceptance: >
+    Unit tests: createService validation (empty name, invalid duration, valid modality).
+    Integration tests: full CRUD lifecycle, soft-delete preserving bookings,
+    audit log entries for each operation.
+    RLS test: therapist B cannot access therapist A's services.
+    Edge cases: deleting service with existing bookings (S5).
+  depends_on:
+    - T-BS-004
+
+- id: T-BS-006
+  title: "Apply indexes for services table (DB phase 10 -- services portion)"
+  implements: "booking-services/R10"
+  status: pending
+  tier: db
+  acceptance: >
+    idx_services_therapist_active index created on (therapist_id, is_active) WHERE is_active = true.
+    set_updated_at trigger applied to services table.
+  depends_on:
+    - T-BS-002

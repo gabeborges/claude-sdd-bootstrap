@@ -1,0 +1,165 @@
+# Booking Management -- Tasks
+# Feature: booking-management
+# Spec: .ops/build/v0/booking-management/specs.md
+# Generated: 2026-02-06
+
+- id: T-BM-001
+  title: "Implement therapist booking list Server Action (read all own bookings)"
+  implements: "booking-management/R1, booking-management/R10"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Action getTherapistBookings() returns all bookings for authenticated therapist.
+    Includes: service name, client name, date/time, status (confirmed/cancelled/completed).
+    Supports filtering by status and date range.
+    RLS enforces therapist-scoped access (therapist_id = auth.uid()).
+    Past and upcoming bookings returned.
+  depends_on:
+    - T-BP-002
+    - T-BP-003
+
+- id: T-BM-002
+  title: "Implement therapist reschedule booking Server Action"
+  implements: "booking-management/R2, booking-management/R7, booking-management/R9, booking-management/R15, booking-management/R16"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Action rescheduleBooking(bookingId, newStartTime) for authenticated therapist.
+    Validates new slot availability (same checks as new booking).
+    Uses slot locking mechanism to prevent double-booking during reschedule.
+    Releases original time slot. Updates booking start_time/end_time.
+    Audit log entry with before/after state (old time, new time).
+    Returns error if new slot is unavailable.
+  depends_on:
+    - T-BP-007
+    - T-BP-006
+
+- id: T-BM-003
+  title: "Implement therapist cancel booking Server Action"
+  implements: "booking-management/R3, booking-management/R8, booking-management/R9, booking-management/R16"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Action cancelBooking(bookingId, reason?) for authenticated therapist.
+    Updates booking status to 'cancelled'. Records optional cancellation_reason.
+    Releases time slot (slot becomes available for new bookings).
+    Audit log entry with before/after state.
+    State transition: confirmed -> cancelled.
+  depends_on:
+    - T-BP-002
+    - T-BP-003
+    - T-TS-004
+
+- id: T-BM-004
+  title: "Implement therapist manual booking creation Server Action"
+  implements: "booking-management/R4, booking-management/R9, booking-management/R17"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Action createManualBooking(serviceId, startTime, clientName, clientEmail, clientPhone).
+    Same validation as public booking (name, email, phone required).
+    Uses slot locking mechanism. Creates booking with created_by = therapist UUID.
+    Generates manage_token for client self-service.
+    Audit log entry with actor = therapist UUID.
+    Consent implicitly granted by therapist acting on behalf of client.
+  depends_on:
+    - T-BP-007
+    - T-BP-006
+
+- id: T-BM-005
+  title: "Implement client booking access via manage_token"
+  implements: "booking-management/R5, booking-management/R6, booking-management/R11, booking-management/S7"
+  status: pending
+  tier: backend
+  acceptance: >
+    API/page that accepts manage_token to load a single booking.
+    Token scoped to exactly one booking. Cannot access other bookings or therapist data.
+    Returns booking details: service name, date/time, status.
+    Token manipulation (changing token to access other bookings) denied.
+    May use RPC function or Edge Function instead of header-based RLS approach.
+  depends_on:
+    - T-BP-002
+    - T-BP-003
+
+- id: T-BM-006
+  title: "Implement client reschedule via manage_token"
+  implements: "booking-management/R5, booking-management/R7, booking-management/R9, booking-management/R15, booking-management/S5"
+  status: pending
+  tier: backend
+  acceptance: >
+    Client can reschedule their booking via manage_token link.
+    Same slot availability checks and slot locking as therapist reschedule.
+    Original slot released. Booking updated with new time.
+    Audit log entry with actor='client:{email_hash}'.
+    No authentication required (token-based access).
+  depends_on:
+    - T-BM-005
+    - T-BM-002
+
+- id: T-BM-007
+  title: "Implement client cancel via manage_token"
+  implements: "booking-management/R6, booking-management/R8, booking-management/R9, booking-management/S6"
+  status: pending
+  tier: backend
+  acceptance: >
+    Client can cancel their booking via manage_token link.
+    Updates status to 'cancelled'. Releases time slot.
+    Audit log entry with actor='client:{email_hash}'.
+    No authentication required (token-based access).
+  depends_on:
+    - T-BM-005
+    - T-BM-003
+
+- id: T-BM-008
+  title: "Build therapist booking management dashboard UI"
+  implements: "booking-management/R1, booking-management/R2, booking-management/R3, booking-management/R4, booking-management/R14, booking-management/S1, booking-management/S2, booking-management/S3, booking-management/S4"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Booking management page showing all therapist bookings.
+    Columns: service name, client name, date/time, status.
+    Filter/sort by status and date. Upcoming vs past bookings view.
+    Reschedule action: opens slot picker for new time.
+    Cancel action: confirmation dialog with optional reason.
+    Manual create: form with service, slot, client details.
+    WCAG compliant: keyboard navigable, screen reader accessible.
+  depends_on:
+    - T-BM-001
+    - T-BM-002
+    - T-BM-003
+    - T-BM-004
+
+- id: T-BM-009
+  title: "Build client booking management page (manage via token)"
+  implements: "booking-management/R5, booking-management/R6, booking-management/R11, booking-management/S5, booking-management/S6, booking-management/S7"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Public page accessible via manage_token URL (e.g., /manage/{token}).
+    Displays booking details: service, date/time, status.
+    Reschedule button: shows available slots, allows selection.
+    Cancel button: confirmation dialog.
+    Scoped to single booking only. No access to other bookings.
+    WCAG compliant.
+  depends_on:
+    - T-BM-005
+    - T-BM-006
+    - T-BM-007
+
+- id: T-BM-010
+  title: "Write tests for booking management operations"
+  implements: "booking-management/S1, booking-management/S2, booking-management/S3, booking-management/S4, booking-management/S5, booking-management/S6, booking-management/S7, booking-management/S8, booking-management/S9, booking-management/S10"
+  status: pending
+  tier: test
+  acceptance: >
+    Unit tests: reschedule validation, cancel state transition, manual booking creation.
+    Integration tests: full reschedule flow (slot lock, update, slot release),
+    cancel flow (status change, slot release), manual create flow.
+    Client token tests: valid token access, token manipulation denied (S7),
+    client reschedule/cancel via token.
+    RLS test: therapist B cannot access therapist A's bookings (S9).
+    Edge case: reschedule to already-booked slot fails (S8).
+    Cancelled booking slot becomes available (S10).
+  depends_on:
+    - T-BM-008
+    - T-BM-009

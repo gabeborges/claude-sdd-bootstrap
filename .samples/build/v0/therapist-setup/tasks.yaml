@@ -1,0 +1,171 @@
+# Therapist Setup -- Tasks
+# Feature: therapist-setup
+# Spec: .ops/build/v0/therapist-setup/specs.md
+# Generated: 2026-02-06
+
+- id: T-TS-001
+  title: "Create therapists table migration (DB phase 1)"
+  implements: "therapist-setup/R10, therapist-setup/R11, therapist-setup/R15"
+  status: pending
+  tier: db
+  acceptance: >
+    therapists table created per db-migration-plan.yaml phase 1 SQL.
+    Columns match system-design.yaml entity definition.
+    RLS enabled on the table. Encrypted column comments present for OAuth tokens.
+    Migration file: 20260206000001_create_therapists.sql.
+  depends_on: []
+
+- id: T-TS-002
+  title: "Apply RLS policies for therapists table (DB phase 9 -- therapists portion)"
+  implements: "therapist-setup/R15"
+  status: pending
+  tier: db
+  acceptance: >
+    therapists_select_own, therapists_update_own, therapists_insert_own policies applied.
+    Therapist can only read/write own row (WHERE id = auth.uid()).
+    Verified via Supabase test or SQL assertion.
+  depends_on:
+    - T-TS-001
+
+- id: T-TS-003
+  title: "Apply indexes and updated_at trigger for therapists table (DB phase 10 -- therapists portion)"
+  implements: "therapist-setup/R10"
+  status: pending
+  tier: db
+  acceptance: >
+    update_updated_at_column() function created.
+    set_updated_at trigger applied to therapists table.
+    slug and google_id unique indexes confirmed (implicit from UNIQUE constraint).
+  depends_on:
+    - T-TS-002
+
+- id: T-TS-004
+  title: "Create booking_audit_log table migration (DB phase 5)"
+  implements: "therapist-setup/R13, therapist-setup/R14"
+  status: pending
+  tier: db
+  acceptance: >
+    booking_audit_log table created per db-migration-plan.yaml phase 5 SQL.
+    Immutability triggers (prevent_audit_log_mutation) applied.
+    INSERT-only enforced; UPDATE and DELETE blocked by triggers.
+    RLS enabled with audit_log_select_own and audit_log_insert_service policies.
+  depends_on:
+    - T-TS-001
+
+- id: T-TS-005
+  title: "Implement Google OAuth sign-in flow (profile + email scopes)"
+  implements: "therapist-setup/R1, therapist-setup/R2, therapist-setup/S1, therapist-setup/S9"
+  status: pending
+  tier: backend
+  acceptance: >
+    Therapist can sign in via Google OAuth with profile+email scopes only.
+    On first sign-in, therapists row created with setup_step='practice_details'.
+    Google ID and email populated from OAuth response.
+    No calendar scopes requested at this step.
+    Supabase Auth configured for Google provider.
+  depends_on:
+    - T-TS-001
+    - T-TS-002
+
+- id: T-TS-006
+  title: "Implement practice details step (practice name, timezone, slug)"
+  implements: "therapist-setup/R3, therapist-setup/R4, therapist-setup/R8, therapist-setup/S2"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Action accepts practice_name, timezone (IANA), and slug.
+    Validates timezone against IANA list. Validates slug uniqueness.
+    Updates therapists row. Advances setup_step to 'google_calendar'.
+    Audit log entry emitted for practice details saved.
+  depends_on:
+    - T-TS-005
+    - T-TS-004
+
+- id: T-TS-007
+  title: "Implement Google Calendar OAuth connection (incremental authorization)"
+  implements: "therapist-setup/R2, therapist-setup/R5, therapist-setup/R12, therapist-setup/R18, therapist-setup/S3, therapist-setup/S10"
+  status: pending
+  tier: backend
+  acceptance: >
+    Therapist can connect Google Calendar via incremental OAuth for calendar scopes.
+    OAuth tokens (access + refresh) stored encrypted in therapists row.
+    google_calendar_connected set to true. google_oauth_scopes updated.
+    Audit log entry emitted with action 'google.oauth.connected' and scopes granted.
+    On OAuth failure or denial, clear error displayed with retry option.
+    Tokens never logged or exposed client-side.
+  depends_on:
+    - T-TS-006
+
+- id: T-TS-008
+  title: "Implement setup completion logic and booking page URL generation"
+  implements: "therapist-setup/R8, therapist-setup/R9, therapist-setup/R13, therapist-setup/S6, therapist-setup/S7"
+  status: pending
+  tier: backend
+  acceptance: >
+    After service creation + availability setup, setup_completed_at is set.
+    Booking page URL generated using therapist slug (/{slug}/booking).
+    Therapist shown their booking URL on completion screen.
+    Audit log entry emitted with action 'setup.completed'.
+    If setup incomplete, booking page shows 'not yet available' message.
+  depends_on:
+    - T-TS-007
+    - T-BS-003
+    - T-AV-003
+
+- id: T-TS-009
+  title: "Implement setup resume (persisted setup state)"
+  implements: "therapist-setup/R17, therapist-setup/S8"
+  status: pending
+  tier: backend
+  acceptance: >
+    setup_step column tracks current onboarding step.
+    On sign-in, therapist redirected to their current setup_step.
+    Previous progress (practice details, calendar connection) preserved.
+    Tested: close browser at step 2, re-login, land on step 3.
+  depends_on:
+    - T-TS-005
+
+- id: T-TS-010
+  title: "Build setup flow UI (multi-step form with progress indicator)"
+  implements: "therapist-setup/R9, therapist-setup/R16, therapist-setup/S2, therapist-setup/S3, therapist-setup/S4, therapist-setup/S5, therapist-setup/S12"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Multi-step UI with clear progress indicator (step numbers or progress bar).
+    Steps: 1) Practice details (name, timezone, slug), 2) Google Calendar connect,
+    3) Create first service (delegates to service CRUD UI), 4) Set availability
+    (delegates to availability UI), 5) Completion with booking URL.
+    All form fields keyboard-navigable with clear focus indicators.
+    WCAG compliant: screen reader accessible, sufficient contrast.
+  depends_on:
+    - T-TS-006
+    - T-TS-007
+    - T-TS-008
+    - T-TS-009
+
+- id: T-TS-011
+  title: "Build Google OAuth sign-in page"
+  implements: "therapist-setup/R1, therapist-setup/S1, therapist-setup/R16"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Sign-in page with 'Sign in with Google' button.
+    WCAG compliant. On success, redirects to setup flow or dashboard.
+    No calendar scopes requested at sign-in.
+  depends_on:
+    - T-TS-005
+
+- id: T-TS-012
+  title: "Write tests for therapist setup flow"
+  implements: "therapist-setup/S1, therapist-setup/S2, therapist-setup/S3, therapist-setup/S6, therapist-setup/S7, therapist-setup/S8, therapist-setup/S9, therapist-setup/S10, therapist-setup/S11"
+  status: pending
+  tier: test
+  acceptance: >
+    Unit tests: OAuth callback handling, setup_step advancement, slug validation.
+    Integration tests: full setup flow (mock OAuth), setup resume, RLS isolation.
+    Test that incomplete setup shows 'not yet available' on booking page.
+    Test that OAuth failure shows retry option.
+    Test tenant isolation (therapist B cannot access therapist A data).
+  depends_on:
+    - T-TS-010
+    - T-TS-011

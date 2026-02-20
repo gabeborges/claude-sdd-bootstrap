@@ -1,0 +1,40 @@
+{
+  "version": "5.8.2",
+  "integrations": [
+    "agents-md",
+    "cursor"
+  ],
+  "templates": {
+    "prdQuestions": "default",
+    "fullPrd": "default",
+    "quickPrd": "default"
+  },
+  "outputs": {
+    "path": ".clavix/outputs",
+    "format": "markdown"
+  },
+  "preferences": {
+    "autoOpenOutputs": false,
+    "verboseLogging": false
+  },
+  "restrictions": {
+    "blockedCommands": [
+      "/clavix:implement",
+      "/clavix:verify"
+    ],
+    "planningOnly": true,
+    "noTechnicalDesign": true,
+    "noArchitecture": true,
+    "noAPIs": true,
+    "noSchemas": true,
+    "allowedCommands": [
+      "/clavix:start",
+      "/clavix:prd",
+      "/clavix:plan",
+      "/clavix:improve",
+      "/clavix:refine",
+      "clavix:summarize",
+      "/clavix:archive"
+    ]
+  }
+}

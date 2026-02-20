@@ -1,0 +1,110 @@
+# Availability -- Tasks
+# Feature: availability
+# Spec: .ops/build/v0/availability/specs.md
+# Generated: 2026-02-06
+
+- id: T-AV-001
+  title: "Create availability table migration (DB phase 3)"
+  implements: "availability/R6, availability/R10, availability/R11"
+  status: pending
+  tier: db
+  acceptance: >
+    availability table created per db-migration-plan.yaml phase 3 SQL.
+    Columns: id, therapist_id (FK), day_of_week (CHECK 0-6), start_time, end_time, timestamps.
+    availability_time_order CHECK constraint (end_time > start_time).
+    btree_gist extension enabled. availability_no_overlap exclusion constraint applied.
+    RLS enabled. FK to therapists with ON DELETE CASCADE.
+    Migration file: 20260206000003_create_availability.sql.
+  depends_on:
+    - T-TS-001
+
+- id: T-AV-002
+  title: "Apply RLS policies for availability table (DB phase 9 -- availability portion)"
+  implements: "availability/R6"
+  status: pending
+  tier: db
+  acceptance: >
+    availability_select_own, availability_select_public (anon),
+    availability_insert_own, availability_update_own, availability_delete_own policies applied.
+    Therapist CRUD restricted to own availability. Anon can read all availability
+    (non-PHI schedule data, scoped by application query).
+  depends_on:
+    - T-AV-001
+
+- id: T-AV-003
+  title: "Implement availability CRUD Server Actions"
+  implements: "availability/R1, availability/R2, availability/R3, availability/R4, availability/R5, availability/R7, availability/R13"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Actions for: setAvailability, getAvailability, deleteAvailabilityBlock.
+    Validation: overlapping blocks on same day rejected (application-level + DB exclusion constraint).
+    minimum_notice_hours configurable on therapist profile (update therapists.minimum_notice_hours).
+    Timezone stored on therapist profile; availability times interpreted in therapist timezone.
+    Changes do not affect existing confirmed bookings.
+    Audit log entry emitted for each create/update/delete operation.
+  depends_on:
+    - T-AV-001
+    - T-AV-002
+    - T-TS-004
+
+- id: T-AV-004
+  title: "Implement slot computation logic (availability minus bookings minus locks)"
+  implements: "availability/R8, availability/R9, availability/S9"
+  status: pending
+  tier: backend
+  acceptance: >
+    Function computeAvailableSlots(therapistId, serviceId, dateRange) that:
+    1) Fetches therapist availability blocks for relevant days.
+    2) Subtracts confirmed bookings and active slot_locks.
+    3) Generates time slots based on service duration.
+    4) Applies minimum_notice_hours filter.
+    5) Returns slots in therapist timezone.
+    Slots exclude already-booked times and locked slots.
+    Expired slot_locks are filtered out (treated as non-existent).
+  depends_on:
+    - T-AV-003
+    - T-BP-001
+
+- id: T-AV-005
+  title: "Build availability management UI"
+  implements: "availability/R1, availability/R2, availability/R3, availability/R4, availability/R12, availability/S1, availability/S2, availability/S3, availability/S4, availability/S10"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Availability page with: day-of-week selectors, time block inputs per day.
+    Multiple time blocks per day supported (add/remove blocks).
+    Timezone selector (IANA timezone list). Minimum notice hours input.
+    Overlap validation with clear error message.
+    All day selectors, time inputs, and save actions keyboard-navigable.
+    WCAG compliant: screen reader accessible, sufficient contrast.
+  depends_on:
+    - T-AV-003
+
+- id: T-AV-006
+  title: "Write tests for availability management and slot computation"
+  implements: "availability/S1, availability/S2, availability/S3, availability/S4, availability/S5, availability/S6, availability/S7, availability/S8, availability/S9"
+  status: pending
+  tier: test
+  acceptance: >
+    Unit tests: overlap detection, slot computation (subtract bookings + locks),
+    minimum notice filtering, timezone handling.
+    Integration tests: full CRUD lifecycle, exclusion constraint enforcement,
+    slot computation with real DB data.
+    RLS test: therapist B cannot access therapist A's availability.
+    Edge cases: minimum_notice=0 (same-day booking allowed),
+    minimum_notice=24 (today's slots excluded), existing bookings unaffected by changes.
+  depends_on:
+    - T-AV-005
+    - T-AV-004
+
+- id: T-AV-007
+  title: "Apply indexes for availability table (DB phase 10 -- availability portion)"
+  implements: "availability/R10"
+  status: pending
+  tier: db
+  acceptance: >
+    idx_availability_therapist_day index created on (therapist_id, day_of_week).
+    set_updated_at trigger applied to availability table.
+  depends_on:
+    - T-AV-002

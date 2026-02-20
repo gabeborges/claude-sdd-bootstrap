@@ -1,0 +1,209 @@
+# Booking Page -- Tasks
+# Feature: booking-page
+# Spec: .ops/build/v0/booking-page/specs.md
+# Generated: 2026-02-06
+
+- id: T-BP-001
+  title: "Create slot_locks table migration (DB phase 6)"
+  implements: "booking-page/R5, booking-page/R19"
+  status: pending
+  tier: db
+  acceptance: >
+    slot_locks table created per db-migration-plan.yaml phase 6 SQL.
+    Columns: id, therapist_id (FK), start_time, end_time, locked_by, expires_at, created_at.
+    slot_locks_time_order CHECK constraint. Partial unique index idx_slot_locks_active_unique.
+    RLS enabled. FK to therapists with ON DELETE CASCADE.
+    Migration file: 20260206000006_create_slot_locks.sql.
+  depends_on:
+    - T-TS-001
+
+- id: T-BP-002
+  title: "Create bookings table migration (DB phase 4)"
+  implements: "booking-page/R6, booking-page/R7, booking-page/R13, booking-page/R14, booking-page/R16"
+  status: pending
+  tier: db
+  acceptance: >
+    bookings table created per db-migration-plan.yaml phase 4 SQL.
+    All columns match system-design.yaml: client fields, status, modality, manage_token, etc.
+    client_consent CHECK (= true). Status CHECK IN (confirmed, cancelled, completed).
+    bookings_time_order CHECK constraint. manage_token UNIQUE.
+    FK to therapists (no cascade). FK to services (ON DELETE RESTRICT).
+    RLS enabled. Migration file: 20260206000004_create_bookings.sql.
+  depends_on:
+    - T-TS-001
+    - T-BS-001
+
+- id: T-BP-003
+  title: "Apply RLS policies for bookings table (DB phase 9 -- bookings portion)"
+  implements: "booking-page/R16"
+  status: pending
+  tier: db
+  acceptance: >
+    bookings_select_own, bookings_select_by_token (anon via manage_token),
+    bookings_insert_public (anon), bookings_update_own,
+    bookings_update_by_token (anon) policies applied.
+    No DELETE policy (bookings are cancelled, not deleted).
+    Therapist reads/writes own. Anon insert for public booking. Client via token.
+  depends_on:
+    - T-BP-002
+
+- id: T-BP-004
+  title: "Apply RLS policies for slot_locks table (DB phase 9 -- slot_locks portion)"
+  implements: "booking-page/R5, booking-page/R19"
+  status: pending
+  tier: db
+  acceptance: >
+    slot_locks_select_public (anon), slot_locks_select_own,
+    slot_locks_insert_public (anon), slot_locks_delete_expired policies applied.
+    Public read for slot computation. Public insert for client slot locking.
+    Expired lock cleanup allowed.
+  depends_on:
+    - T-BP-001
+
+- id: T-BP-005
+  title: "Apply indexes for bookings and slot_locks tables (DB phase 10 -- booking/lock portions)"
+  implements: "booking-page/R11"
+  status: pending
+  tier: db
+  acceptance: >
+    Bookings indexes: idx_bookings_therapist_status_time, idx_bookings_therapist_time_confirmed,
+    idx_bookings_service. set_updated_at trigger applied to bookings.
+    Slot_locks indexes: idx_slot_locks_active, idx_slot_locks_expires.
+    All indexes match db-migration-plan.yaml phase 10 SQL.
+  depends_on:
+    - T-BP-003
+    - T-BP-004
+
+- id: T-BP-006
+  title: "Implement slot locking mechanism (create lock, timeout, release)"
+  implements: "booking-page/R5, booking-page/R19, booking-page/S3, booking-page/S4, booking-page/S8"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Action/API for: lockSlot(therapistId, startTime, endTime, lockedBy).
+    Creates slot_lock with configurable expires_at timeout.
+    Partial unique index prevents concurrent locks on same slot.
+    Expired locks treated as non-existent in slot computation.
+    On lock conflict, clear error returned indicating slot is unavailable.
+    Atomic booking insert re-checks slot availability (defense against timeout edge case).
+  depends_on:
+    - T-BP-001
+    - T-BP-004
+
+- id: T-BP-007
+  title: "Implement booking creation Server Action (public endpoint)"
+  implements: "booking-page/R6, booking-page/R7, booking-page/R8, booking-page/R9, booking-page/R13, booking-page/R17, booking-page/S5, booking-page/S6, booking-page/S7"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server Action/Edge Function for createBooking (public, no auth required).
+    Validates: name (non-empty), email (format), phone (format), consent (must be true).
+    Generates unique manage_token for client self-service.
+    Creates booking with status 'confirmed'. Consumes slot_lock.
+    Booking end_time computed from service duration_minutes.
+    Modality copied from service.
+    Audit log entry: actor='client:{email_hash}', action='booking.created'.
+    Returns booking confirmation data (service name, date, time, therapist name).
+  depends_on:
+    - T-BP-002
+    - T-BP-003
+    - T-BP-006
+    - T-TS-004
+
+- id: T-BP-008
+  title: "Implement therapist and service lookup by slug (public API)"
+  implements: "booking-page/R1, booking-page/R2, booking-page/R15, booking-page/S1, booking-page/S9, booking-page/S13"
+  status: pending
+  tier: backend
+  acceptance: >
+    Server-side data fetching for /{slug}/booking page.
+    Resolves therapist by slug. Returns active services (name, duration, modality, description).
+    Returns therapist display data (practice name, timezone). Does NOT expose
+    therapist email, phone, internal IDs, or any unnecessary personal data.
+    Returns empty service list gracefully when no services configured.
+    Returns 404 or 'not found' for invalid slug.
+  depends_on:
+    - T-BS-001
+    - T-BS-002
+    - T-TS-001
+
+- id: T-BP-009
+  title: "Build booking page UI -- service selection view"
+  implements: "booking-page/R1, booking-page/R2, booking-page/R11, booking-page/R12, booking-page/R20, booking-page/S1, booking-page/S9, booking-page/S13"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Public page at /{slug}/booking (Next.js dynamic route).
+    Displays therapist practice name and list of active services.
+    Each service shows: name, duration, modality, description.
+    Clear message when no services are configured (not an error page).
+    Page loads within ~0.2s target (Server Component, minimal client JS).
+    WCAG compliant: keyboard navigable, screen reader accessible, no purple/blue.
+    No therapist email, phone, or internal IDs exposed in page source or network.
+  depends_on:
+    - T-BP-008
+
+- id: T-BP-010
+  title: "Build booking page UI -- time slot selection view"
+  implements: "booking-page/R3, booking-page/R4, booking-page/R5, booking-page/R12, booking-page/S2, booking-page/S3, booking-page/S10"
+  status: pending
+  tier: frontend
+  acceptance: >
+    After service selection, displays available time slots.
+    Slots shown in therapist's timezone with timezone label.
+    Slots are genuinely available (computed from availability minus bookings minus locks).
+    Selecting a slot triggers slot lock. Locked slot no longer shown to others.
+    Clear message when no time slots available.
+    WCAG compliant: keyboard navigable, screen reader accessible.
+  depends_on:
+    - T-BP-009
+    - T-AV-004
+    - T-BP-006
+
+- id: T-BP-011
+  title: "Build booking page UI -- client details form and confirmation"
+  implements: "booking-page/R6, booking-page/R7, booking-page/R8, booking-page/R9, booking-page/R10, booking-page/R12, booking-page/S5, booking-page/S6, booking-page/S7"
+  status: pending
+  tier: frontend
+  acceptance: >
+    Form with: name (text), email (email validation), phone (format validation),
+    consent checkbox (unchecked by default, explicit affirmative action).
+    Consent text clearly states what data is collected and purpose.
+    All fields required. Validation errors displayed per field.
+    On submit: calls booking creation action. On success: confirmation screen
+    with service name, date, time, therapist name.
+    WCAG compliant: labeled inputs, error announcements, keyboard navigable.
+  depends_on:
+    - T-BP-010
+    - T-BP-007
+
+- id: T-BP-012
+  title: "Build booking page -- edge case handling (no services, no availability, slot taken)"
+  implements: "booking-page/R18, booking-page/R19, booking-page/S4, booking-page/S8, booking-page/S9, booking-page/S10"
+  status: pending
+  tier: frontend
+  acceptance: >
+    No services: clear message "No services currently available".
+    No availability: clear message "No time slots currently available".
+    Slot lock timeout: slot released and available again for others.
+    Double-booking race: second client gets clear error, prompted to choose another time.
+    All edge case messages are accessible and not generic error pages.
+  depends_on:
+    - T-BP-011
+
+- id: T-BP-013
+  title: "Write tests for booking page flow"
+  implements: "booking-page/S1, booking-page/S2, booking-page/S3, booking-page/S4, booking-page/S5, booking-page/S6, booking-page/S7, booking-page/S8, booking-page/S9, booking-page/S10, booking-page/S11, booking-page/S12, booking-page/S13"
+  status: pending
+  tier: test
+  acceptance: >
+    Unit tests: field validation (email format, phone format, consent required),
+    slot computation, slot lock creation/expiry, manage_token generation.
+    Integration tests: full booking flow (service selection -> slot -> details -> confirm),
+    double-booking prevention (two concurrent bookings, one fails),
+    edge cases (no services, no availability, slot timeout).
+    Performance test: page load within 0.2s target.
+    Accessibility: automated WCAG check on booking page.
+    Data minimization: no PHI in page source or network requests beyond required fields.
+  depends_on:
+    - T-BP-012

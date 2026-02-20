@@ -1,0 +1,396 @@
+# Curio Booking & Scheduling -- System Design
+# Single evolving architecture reference for the product.
+# Consumed by: database-administrator, project-task-planner, all implementation agents.
+
+system:
+  goal: "Booking and scheduling system for solo online therapists -- clients self-book, therapists manage with minimal effort"
+  boundaries:
+    - "Canada-only data residency (all data stored in CA region)"
+    - "HIPAA/PHIPA compliance from day 0 -- PHI-adjacent data encrypted at rest and in transit (TLS 1.2+)"
+    - "Supabase RLS enforced on all tables -- no application-level-only authorization"
+    - "WCAG accessibility required on all UI surfaces"
+    - "No silent writes -- every external system write requires explicit action + audit entry"
+    - "No AI features in v0 -- deterministic system only"
+    - "Solo therapist only -- single-tenant per therapist"
+    - "Google OAuth is sole identity provider"
+    - "Event-driven audit logging on all state-changing operations"
+
+architecture:
+  components:
+    - name: "next-app"
+      type: "frontend + server"
+      tech: "Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Headless UI"
+      role: "Server Components by default, client components only when required. Server Actions for mutations. Public booking page + authenticated therapist dashboard."
+      deploy: "Vercel"
+
+    - name: "supabase-backend"
+      type: "backend"
+      tech: "Supabase (Postgres + Auth + RLS + Edge Functions + Storage)"
+      role: "Database, auth, row-level security, server-side logic via Edge Functions. Canada-region project."
+      notes:
+        - "RLS policies on every table"
+        - "Encryption at rest via Supabase defaults"
+        - "Edge Functions handle server-side logic that cannot run in Next.js Server Actions"
+
+    - name: "resend-email"
+      type: "external service"
+      tech: "Resend"
+      role: "Transactional email delivery -- confirmations, reschedule/cancel notifications, reminders"
+
+    - name: "google-workspace"
+      type: "external service"
+      tech: "Google OAuth, Google Calendar API, Google Meet"
+      role: "Identity provider, calendar event sync (one-way Curio->GCal), Meet link generation for online appointments"
+
+  integrations:
+    - name: "google-oauth"
+      direction: "inbound"
+      purpose: "Therapist authentication and identity"
+      notes:
+        - "Incremental authorization: profile+email scopes first, calendar scopes at Calendar connection step"
+        - "Least-privilege scopes"
+        - "Tokens encrypted at rest, never logged or exposed client-side"
+
+    - name: "google-calendar-api"
+      direction: "outbound"
+      purpose: "One-way sync: Curio creates/updates/deletes calendar events on booking lifecycle"
+      notes:
+        - "Curio stores event references (event_id), not full event duplicates"
+        - "Google Calendar is SoR for the event; Curio is SoR for the booking"
+        - "Meet link auto-generated for online modality"
+        - "API failures do not block bookings -- retry with backoff"
+        - "No silent writes -- every calendar write maps to a booking action + audit entry"
+        - "Auto token refresh; graceful degradation on revocation"
+
+    - name: "resend"
+      direction: "outbound"
+      purpose: "Booking lifecycle emails and appointment reminders"
+      notes:
+        - "Best-effort delivery with retry -- failures do not block bookings"
+        - "Data minimization in email content -- no phone numbers or internal IDs"
+        - "Email events logged (type, timestamp, booking ref) -- not full body"
+
+  data:
+    entities:
+      - name: "therapists"
+        description: "Therapist profile and practice configuration"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "google_id", type: "text", constraints: "UNIQUE, NOT NULL" }
+          - { name: "email", type: "text", constraints: "NOT NULL" }
+          - { name: "full_name", type: "text", constraints: "NOT NULL" }
+          - { name: "practice_name", type: "text", constraints: "NOT NULL" }
+          - { name: "timezone", type: "text", constraints: "NOT NULL, IANA timezone identifier" }
+          - { name: "slug", type: "text", constraints: "UNIQUE, NOT NULL -- used in booking URL" }
+          - { name: "setup_completed_at", type: "timestamptz", constraints: "NULL until setup finishes" }
+          - { name: "setup_step", type: "text", constraints: "NOT NULL, tracks onboarding progress for resume" }
+          - { name: "google_oauth_access_token", type: "text", constraints: "ENCRYPTED, NOT NULL after calendar connection" }
+          - { name: "google_oauth_refresh_token", type: "text", constraints: "ENCRYPTED, NOT NULL after calendar connection" }
+          - { name: "google_oauth_token_expires_at", type: "timestamptz", constraints: "NULL" }
+          - { name: "google_oauth_scopes", type: "text[]", constraints: "NOT NULL, tracks granted scopes" }
+          - { name: "google_calendar_connected", type: "boolean", constraints: "NOT NULL, DEFAULT false" }
+          - { name: "minimum_notice_hours", type: "integer", constraints: "NOT NULL, DEFAULT 24, >= 0" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+          - { name: "updated_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Therapist can only read/write own row (WHERE id = auth.uid())"
+
+      - name: "services"
+        description: "Appointment types offered by a therapist"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "therapist_id", type: "uuid", constraints: "FK -> therapists.id, NOT NULL" }
+          - { name: "name", type: "text", constraints: "NOT NULL, max length TBD (design gate)" }
+          - { name: "description", type: "text", constraints: "NULL, optional" }
+          - { name: "duration_minutes", type: "integer", constraints: "NOT NULL, min 15, max TBD (design gate)" }
+          - { name: "modality", type: "text", constraints: "NOT NULL, CHECK IN ('online', 'in_person')" }
+          - { name: "is_active", type: "boolean", constraints: "NOT NULL, DEFAULT true -- design gate: active/inactive vs deletion-only" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+          - { name: "updated_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Therapist CRUD own services; public read of active services for booking page (via therapist slug)"
+
+      - name: "availability"
+        description: "Weekly time blocks defining when a therapist is bookable"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "therapist_id", type: "uuid", constraints: "FK -> therapists.id, NOT NULL" }
+          - { name: "day_of_week", type: "integer", constraints: "NOT NULL, 0=Sunday..6=Saturday" }
+          - { name: "start_time", type: "time", constraints: "NOT NULL, in therapist timezone" }
+          - { name: "end_time", type: "time", constraints: "NOT NULL, in therapist timezone, must be > start_time" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+          - { name: "updated_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Therapist CRUD own availability; public read for booking page slot computation"
+        notes:
+          - "Multiple rows per day allowed (multiple time blocks)"
+          - "Overlapping blocks on same day must be rejected (application + DB constraint)"
+
+      - name: "bookings"
+        description: "Core entity -- client appointments with therapists"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "therapist_id", type: "uuid", constraints: "FK -> therapists.id, NOT NULL" }
+          - { name: "service_id", type: "uuid", constraints: "FK -> services.id, NOT NULL" }
+          - { name: "client_name", type: "text", constraints: "NOT NULL" }
+          - { name: "client_email", type: "text", constraints: "NOT NULL" }
+          - { name: "client_phone", type: "text", constraints: "NOT NULL" }
+          - { name: "client_consent", type: "boolean", constraints: "NOT NULL, must be true" }
+          - { name: "start_time", type: "timestamptz", constraints: "NOT NULL" }
+          - { name: "end_time", type: "timestamptz", constraints: "NOT NULL" }
+          - { name: "status", type: "text", constraints: "NOT NULL, CHECK IN ('confirmed', 'cancelled', 'completed'), DEFAULT 'confirmed'" }
+          - { name: "modality", type: "text", constraints: "NOT NULL, CHECK IN ('online', 'in_person')" }
+          - { name: "meet_link", type: "text", constraints: "NULL, populated for online bookings after GCal sync" }
+          - { name: "manage_token", type: "text", constraints: "UNIQUE, NOT NULL -- tokenized link for client self-service" }
+          - { name: "manage_token_expires_at", type: "timestamptz", constraints: "NULL -- design gate: token expiry policy" }
+          - { name: "cancellation_reason", type: "text", constraints: "NULL" }
+          - { name: "created_by", type: "text", constraints: "NOT NULL, 'client' or therapist UUID" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+          - { name: "updated_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Therapist reads/writes own bookings; public insert for booking creation (scoped to therapist); client access via manage_token only"
+        notes:
+          - "start_time/end_time stored as timestamptz (UTC) for reliable computation"
+          - "Booking state machine: confirmed -> cancelled, confirmed -> completed (design gate: full state set)"
+
+      - name: "booking_audit_log"
+        description: "Immutable log of all state changes across the system"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "entity_type", type: "text", constraints: "NOT NULL -- 'booking', 'service', 'availability', 'therapist', 'gcal_event'" }
+          - { name: "entity_id", type: "uuid", constraints: "NOT NULL" }
+          - { name: "action", type: "text", constraints: "NOT NULL -- e.g. 'booking.created', 'service.updated', 'gcal.event.created'" }
+          - { name: "actor", type: "text", constraints: "NOT NULL -- therapist UUID, 'client:{email_hash}', or 'system'" }
+          - { name: "before_state", type: "jsonb", constraints: "NULL -- previous state for updates" }
+          - { name: "after_state", type: "jsonb", constraints: "NULL -- new state" }
+          - { name: "metadata", type: "jsonb", constraints: "NULL -- extra context (e.g. scopes granted, error details)" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Therapist reads own audit logs; insert-only (no updates or deletes)"
+        notes:
+          - "Immutable -- no UPDATE or DELETE allowed"
+          - "Do not log full PHI payloads -- use hashed emails, no phone numbers"
+          - "Append-only pattern: insert via trigger or application layer"
+
+      - name: "slot_locks"
+        description: "Temporary holds on time slots to prevent double-booking during booking flow"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "therapist_id", type: "uuid", constraints: "FK -> therapists.id, NOT NULL" }
+          - { name: "start_time", type: "timestamptz", constraints: "NOT NULL" }
+          - { name: "end_time", type: "timestamptz", constraints: "NOT NULL" }
+          - { name: "locked_by", type: "text", constraints: "NOT NULL -- session or client identifier" }
+          - { name: "expires_at", type: "timestamptz", constraints: "NOT NULL -- auto-release after timeout (design gate: duration)" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Public insert (scoped to therapist); system cleanup of expired locks"
+        notes:
+          - "Expired locks treated as non-existent during slot computation"
+          - "Unique constraint on (therapist_id, start_time, end_time) WHERE expires_at > now() to prevent concurrent locks"
+          - "Cleanup: either via scheduled job or filtered out at query time"
+
+      - name: "google_calendar_events"
+        description: "References to Google Calendar events created from bookings"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "booking_id", type: "uuid", constraints: "FK -> bookings.id, UNIQUE, NOT NULL" }
+          - { name: "therapist_id", type: "uuid", constraints: "FK -> therapists.id, NOT NULL" }
+          - { name: "google_event_id", type: "text", constraints: "NOT NULL" }
+          - { name: "google_calendar_id", type: "text", constraints: "NOT NULL -- typically 'primary'" }
+          - { name: "meet_link", type: "text", constraints: "NULL -- for online modality" }
+          - { name: "sync_status", type: "text", constraints: "NOT NULL, CHECK IN ('synced', 'pending', 'failed'), DEFAULT 'pending'" }
+          - { name: "last_sync_error", type: "text", constraints: "NULL" }
+          - { name: "last_synced_at", type: "timestamptz", constraints: "NULL" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+          - { name: "updated_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Therapist reads own; system writes only"
+        notes:
+          - "Stores references, not duplicates -- Google Calendar is SoR for the event"
+          - "sync_status tracks whether the latest booking state is reflected in GCal"
+
+      - name: "notification_log"
+        description: "Tracks email notifications sent for bookings"
+        columns:
+          - { name: "id", type: "uuid", constraints: "PK, default gen_random_uuid()" }
+          - { name: "booking_id", type: "uuid", constraints: "FK -> bookings.id, NOT NULL" }
+          - { name: "therapist_id", type: "uuid", constraints: "FK -> therapists.id, NOT NULL" }
+          - { name: "notification_type", type: "text", constraints: "NOT NULL -- 'confirmation', 'reschedule', 'cancellation', 'reminder_24h', 'reminder_1h'" }
+          - { name: "recipient_type", type: "text", constraints: "NOT NULL -- 'client' or 'therapist'" }
+          - { name: "recipient_email_hash", type: "text", constraints: "NOT NULL -- hashed, not plaintext" }
+          - { name: "status", type: "text", constraints: "NOT NULL, CHECK IN ('sent', 'failed', 'pending', 'suppressed'), DEFAULT 'pending'" }
+          - { name: "resend_message_id", type: "text", constraints: "NULL -- Resend API response ID" }
+          - { name: "error_message", type: "text", constraints: "NULL" }
+          - { name: "retry_count", type: "integer", constraints: "NOT NULL, DEFAULT 0" }
+          - { name: "scheduled_for", type: "timestamptz", constraints: "NULL -- for reminders" }
+          - { name: "sent_at", type: "timestamptz", constraints: "NULL" }
+          - { name: "created_at", type: "timestamptz", constraints: "NOT NULL, DEFAULT now()" }
+        rls: "Therapist reads own; system writes"
+        notes:
+          - "Reminders for cancelled bookings must be suppressed (status='suppressed')"
+          - "Do not log full email body -- only type, status, and booking reference"
+
+    key_constraints:
+      - "therapists.google_id is UNIQUE -- one Curio account per Google identity"
+      - "therapists.slug is UNIQUE -- booking URL uniqueness"
+      - "services.therapist_id FK -> therapists.id ON DELETE CASCADE"
+      - "availability.therapist_id FK -> therapists.id ON DELETE CASCADE"
+      - "availability: no overlapping time blocks on same (therapist_id, day_of_week) -- enforce via application + CHECK/exclusion"
+      - "bookings.therapist_id FK -> therapists.id"
+      - "bookings.service_id FK -> services.id ON DELETE SET NULL or RESTRICT -- existing bookings must survive service deletion (design gate)"
+      - "bookings.manage_token is UNIQUE -- one token per booking for client access"
+      - "bookings: no overlapping confirmed bookings for same therapist at same time -- enforce via slot_locks + application logic"
+      - "slot_locks: partial unique index on (therapist_id, start_time, end_time) WHERE expires_at > now()"
+      - "google_calendar_events.booking_id is UNIQUE -- one GCal event per booking"
+      - "booking_audit_log: INSERT only, no UPDATE/DELETE (immutable)"
+      - "All FKs reference therapist_id for RLS scoping"
+      - "All timestamps stored as timestamptz (UTC)"
+
+flows:
+  - name: "therapist-setup"
+    steps:
+      - "Therapist visits Curio, clicks Sign in with Google"
+      - "Google OAuth flow -- profile+email scopes only"
+      - "therapists row created with setup_step='practice_details'"
+      - "Therapist enters practice_name, timezone, slug"
+      - "Therapist connects Google Calendar (incremental OAuth for calendar scopes)"
+      - "OAuth tokens stored encrypted; audit entry logged"
+      - "Therapist creates at least one service (delegates to service CRUD)"
+      - "Therapist sets availability (delegates to availability CRUD)"
+      - "setup_completed_at set; booking page goes live"
+      - "Audit entry: setup.completed"
+
+  - name: "service-crud"
+    steps:
+      - "Therapist creates/edits/deletes service via authenticated dashboard"
+      - "Validation: name non-empty, duration >= 15 min, modality in (online, in_person)"
+      - "RLS ensures therapist-scoped access"
+      - "Audit entry emitted for each operation with before/after state"
+      - "Deletion: soft-deactivate or hard-delete (design gate) -- existing bookings preserved"
+
+  - name: "availability-configuration"
+    steps:
+      - "Therapist selects available days and time blocks per day"
+      - "Overlap validation: reject overlapping blocks on same day"
+      - "minimum_notice_hours configured on therapist profile"
+      - "RLS enforces therapist-scoped access"
+      - "Audit entry emitted"
+      - "Changes do not affect existing confirmed bookings"
+
+  - name: "client-booking"
+    steps:
+      - "Client navigates to /{slug}/booking (public page)"
+      - "Page loads therapist active services (public RLS read)"
+      - "Client selects service -> available slots computed (availability - booked - locked)"
+      - "Client selects slot -> slot_lock created with timeout"
+      - "Client fills in name, email, phone, consent (all required)"
+      - "Submit -> booking created (confirmed), slot_lock consumed"
+      - "Google Calendar event created async (non-blocking)"
+      - "Meet link generated for online modality, stored on booking"
+      - "Confirmation email sent to client + therapist via Resend (non-blocking)"
+      - "Audit entry: booking.created"
+
+  - name: "booking-management"
+    steps:
+      - "Therapist: views bookings on dashboard (RLS-scoped)"
+      - "Therapist reschedule: select new slot (same lock mechanism), update booking, release old slot"
+      - "Therapist cancel: update status to cancelled, release slot"
+      - "Therapist manual create: select service + slot + enter client details, same flow as client booking"
+      - "Client: accesses via manage_token link in email (no account required)"
+      - "Client reschedule: select new slot, update booking, release old slot"
+      - "Client cancel: update status to cancelled, release slot"
+      - "All changes: audit entry with before/after state"
+      - "All changes: GCal event updated/deleted async"
+      - "All changes: notification emails sent to both parties"
+
+  - name: "google-calendar-sync"
+    steps:
+      - "Triggered by booking create/reschedule/cancel (event-driven, not polling)"
+      - "Refresh OAuth token if expired"
+      - "Create/update/delete Google Calendar event via Calendar API"
+      - "For online: include auto-generated Meet link in event"
+      - "Store event reference in google_calendar_events"
+      - "On API failure: log error, set sync_status='failed', retry with backoff"
+      - "On token revocation: mark calendar disconnected, notify therapist"
+      - "Audit entry for every calendar write"
+      - "No silent writes -- only booking-triggered actions"
+
+  - name: "notification-dispatch"
+    steps:
+      - "Triggered by booking lifecycle events (create, reschedule, cancel)"
+      - "Render email template with booking details (service, date/time in therapist tz, therapist name)"
+      - "For online: include Meet link in confirmation/reminder emails"
+      - "Include manage-booking link (tokenized) in client emails"
+      - "Send via Resend API"
+      - "Log to notification_log (type, status, booking ref, hashed recipient)"
+      - "On failure: log, retry -- do not block booking"
+      - "Reminders: schedule 24h and 1h before appointment"
+      - "Suppression: skip reminders for cancelled bookings"
+
+risks:
+  - risk: "Double-booking race conditions"
+    mitigation: "slot_locks table with partial unique index + timeout; booking insert checks for conflicts; database-level constraint enforcement"
+
+  - risk: "Google Calendar API rate limits or transient failures"
+    mitigation: "Async calendar sync; booking is SoR (never rolled back on GCal failure); retry with exponential backoff; sync_status tracking"
+
+  - risk: "PHI exposure in Google Calendar events or logs"
+    mitigation: "Data minimization in calendar event content (design gate on title format); audit logs use hashed emails, no phone numbers; no full email bodies logged"
+
+  - risk: "Slot lock timeout edge cases (lock expires mid-submission)"
+    mitigation: "Atomic booking insert re-checks slot availability; expired locks filtered at query time; client receives clear error if slot taken"
+
+  - risk: "Email delivery failures"
+    mitigation: "Best-effort with retry; notification_log tracks status; booking confirmed regardless of email outcome"
+
+  - risk: "OAuth token revocation or expiry"
+    mitigation: "Auto refresh; graceful degradation on revocation; therapist notified of disconnected calendar; bookings still function without calendar sync"
+
+  - risk: "Data residency violation"
+    mitigation: "Supabase project in Canada region; Vercel deployment region-pinned; Resend data residency verified"
+
+non_goals:
+  - "Payments or deposits at booking time"
+  - "Group session booking"
+  - "Recurring appointments"
+  - "Two-way calendar sync (only Curio -> GCal)"
+  - "Client accounts or client login"
+  - "Multiple therapist support (practices/teams)"
+  - "Intake forms attached to booking"
+  - "Booking policies (cancellation/rescheduling rules with deadlines/fees)"
+  - "Buffer time between appointments"
+  - "Name display format selection for calendar events"
+  - "Mobile app"
+  - "Offline functionality"
+  - "Design polish or branding customization"
+  - "SMS or push notifications"
+  - "In-app notifications"
+  - "AI features of any kind"
+  - "Microservices architecture"
+  - "Non-Google authentication"
+
+feature_refs:
+  - feature: "therapist-setup"
+    build_version: "v0"
+    path: ".ops/build/v0/therapist-setup/"
+
+  - feature: "booking-services"
+    build_version: "v0"
+    path: ".ops/build/v0/booking-services/"
+
+  - feature: "availability"
+    build_version: "v0"
+    path: ".ops/build/v0/availability/"
+
+  - feature: "booking-page"
+    build_version: "v0"
+    path: ".ops/build/v0/booking-page/"
+
+  - feature: "booking-management"
+    build_version: "v0"
+    path: ".ops/build/v0/booking-management/"
+
+  - feature: "booking-notifications"
+    build_version: "v0"
+    path: ".ops/build/v0/booking-notifications/"
+
+  - feature: "google-calendar-sync"
+    build_version: "v0"
+    path: ".ops/build/v0/google-calendar-sync/"
+
+meta:
+  last_updated_from_build: "v0"
+  last_updated_at: "2026-02-06"

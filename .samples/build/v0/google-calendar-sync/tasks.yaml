@@ -1,0 +1,164 @@
+# Google Calendar Sync -- Tasks
+# Feature: google-calendar-sync
+# Spec: .ops/build/v0/google-calendar-sync/specs.md
+# Generated: 2026-02-06
+
+- id: T-GC-001
+  title: "Create google_calendar_events table migration (DB phase 7)"
+  implements: "google-calendar-sync/R7, google-calendar-sync/R12"
+  status: pending
+  tier: db
+  acceptance: >
+    google_calendar_events table created per db-migration-plan.yaml phase 7 SQL.
+    Columns: id, booking_id (FK UNIQUE), therapist_id (FK), google_event_id,
+    google_calendar_id (DEFAULT 'primary'), meet_link, sync_status
+    (CHECK IN synced/pending/failed), last_sync_error, last_synced_at, timestamps.
+    RLS enabled. FK to bookings (ON DELETE CASCADE) and therapists.
+    Migration file: 20260206000007_create_google_calendar_events.sql.
+  depends_on:
+    - T-BP-002
+    - T-TS-001
+
+- id: T-GC-002
+  title: "Apply RLS policies for google_calendar_events table (DB phase 9 -- gcal portion)"
+  implements: "google-calendar-sync/R15"
+  status: pending
+  tier: db
+  acceptance: >
+    gcal_events_select_own, gcal_events_insert_service, gcal_events_update_service
+    policies applied. Therapist reads own. System writes via service_role.
+  depends_on:
+    - T-GC-001
+
+- id: T-GC-003
+  title: "Apply indexes for google_calendar_events table (DB phase 10 -- gcal portion)"
+  implements: "google-calendar-sync/R7"
+  status: pending
+  tier: db
+  acceptance: >
+    idx_gcal_events_sync_status (sync_status WHERE IN pending/failed).
+    set_updated_at trigger applied to google_calendar_events table.
+    booking_id UNIQUE index confirmed (implicit from UNIQUE constraint).
+  depends_on:
+    - T-GC-002
+
+- id: T-GC-004
+  title: "Implement Google Calendar API client (create, update, delete events)"
+  implements: "google-calendar-sync/R1, google-calendar-sync/R2, google-calendar-sync/R3, google-calendar-sync/R4, google-calendar-sync/R5, google-calendar-sync/R6, google-calendar-sync/R8, google-calendar-sync/R14"
+  status: pending
+  tier: integration
+  acceptance: >
+    Google Calendar API client module with functions:
+    - createCalendarEvent(therapistId, booking): creates event in primary calendar.
+    - updateCalendarEvent(therapistId, eventId, booking): updates event time/details.
+    - deleteCalendarEvent(therapistId, eventId): deletes or cancels event.
+    Uses therapist's OAuth credentials (access_token from therapists table).
+    For online modality: requests conferenceData with Meet link auto-generation.
+    For in-person modality: no Meet link.
+    Event includes: service name, client name, time, duration (in therapist TZ).
+    Event created in therapist's timezone.
+  depends_on:
+    - T-TS-007
+
+- id: T-GC-005
+  title: "Implement OAuth token refresh and revocation handling"
+  implements: "google-calendar-sync/R8, google-calendar-sync/R13, google-calendar-sync/S7, google-calendar-sync/S8"
+  status: pending
+  tier: backend
+  acceptance: >
+    Before each Calendar API call: check token_expires_at.
+    If expired: refresh using refresh_token. Update access_token and expires_at in DB.
+    On refresh failure (token revoked): set google_calendar_connected=false.
+    Notify therapist that calendar sync is disconnected (via UI flag or email).
+    Bookings still function without calendar sync (graceful degradation).
+    Tokens encrypted at rest, never logged.
+  depends_on:
+    - T-TS-007
+    - T-GC-004
+
+- id: T-GC-006
+  title: "Implement calendar sync on booking creation (event-driven)"
+  implements: "google-calendar-sync/R1, google-calendar-sync/R4, google-calendar-sync/R5, google-calendar-sync/R7, google-calendar-sync/R9, google-calendar-sync/R10, google-calendar-sync/S1, google-calendar-sync/S2, google-calendar-sync/S3, google-calendar-sync/S9"
+  status: pending
+  tier: backend
+  acceptance: >
+    On booking.created: call Google Calendar API to create event.
+    For online: include Meet link. Store meet_link on booking record.
+    For in-person: no Meet link.
+    Store event reference in google_calendar_events (google_event_id, sync_status).
+    On success: sync_status='synced', last_synced_at set.
+    On failure: sync_status='failed', last_sync_error logged. Booking NOT rolled back.
+    Audit log entry: action='gcal.event.created', booking ref, event ID.
+    No calendar writes outside of booking actions (no silent writes).
+  depends_on:
+    - T-GC-001
+    - T-GC-002
+    - T-GC-004
+    - T-GC-005
+    - T-BP-007
+    - T-TS-004
+
+- id: T-GC-007
+  title: "Implement calendar sync on booking reschedule"
+  implements: "google-calendar-sync/R2, google-calendar-sync/R9, google-calendar-sync/S4"
+  status: pending
+  tier: backend
+  acceptance: >
+    On booking.rescheduled: update corresponding Google Calendar event with new time.
+    Look up google_calendar_events by booking_id. Call updateCalendarEvent.
+    Update sync_status and last_synced_at.
+    On failure: log error, set sync_status='failed'. Reschedule NOT rolled back.
+    Audit log entry: action='gcal.event.updated'.
+  depends_on:
+    - T-GC-006
+    - T-BM-002
+
+- id: T-GC-008
+  title: "Implement calendar sync on booking cancellation"
+  implements: "google-calendar-sync/R3, google-calendar-sync/R9, google-calendar-sync/S5"
+  status: pending
+  tier: backend
+  acceptance: >
+    On booking.cancelled: delete or mark cancelled the Google Calendar event.
+    Look up google_calendar_events by booking_id. Call deleteCalendarEvent.
+    Update sync_status.
+    On failure: log error, set sync_status='failed'. Cancellation NOT rolled back.
+    Audit log entry: action='gcal.event.deleted'.
+  depends_on:
+    - T-GC-006
+    - T-BM-003
+
+- id: T-GC-009
+  title: "Implement calendar sync retry mechanism for failed syncs"
+  implements: "google-calendar-sync/R11, google-calendar-sync/S6"
+  status: pending
+  tier: backend
+  acceptance: >
+    Retry logic for failed calendar sync operations.
+    Query google_calendar_events WHERE sync_status IN ('pending', 'failed').
+    Retry with exponential backoff.
+    On persistent failure: log for manual review. Booking remains valid.
+    Booking is SoR -- never rolled back on GCal failure.
+  depends_on:
+    - T-GC-006
+
+- id: T-GC-010
+  title: "Write tests for Google Calendar sync"
+  implements: "google-calendar-sync/S1, google-calendar-sync/S2, google-calendar-sync/S3, google-calendar-sync/S4, google-calendar-sync/S5, google-calendar-sync/S6, google-calendar-sync/S7, google-calendar-sync/S8, google-calendar-sync/S9, google-calendar-sync/S10"
+  status: pending
+  tier: test
+  acceptance: >
+    Unit tests: event creation payload (online vs in-person), token refresh logic,
+    sync_status state transitions, Meet link handling.
+    Integration tests (mock Google API): create event on booking,
+    update event on reschedule, delete event on cancel.
+    Error handling: API failure does not block booking (S6),
+    token refresh on expired token (S7), revocation handling (S8).
+    No silent writes: verify no calendar writes without booking action (S9).
+    Tenant isolation: therapist A booking does not affect therapist B calendar (S10).
+  depends_on:
+    - T-GC-006
+    - T-GC-007
+    - T-GC-008
+    - T-GC-009
+    - T-GC-005

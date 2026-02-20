@@ -1,0 +1,77 @@
+# Curio v0 -- Build Checks
+# Gate results for v0 build artifacts.
+# Updated: 2026-02-06
+# Last modified by: compliance-engineer
+
+db_migration:
+  status: pass
+  blockers: []
+  notes:
+    - "Risk level: LOW -- greenfield schema creation, all operations are additive CREATE TABLE"
+    - "8 tables planned in FK dependency order: therapists -> services, availability, slot_locks -> bookings -> booking_audit_log, google_calendar_events, notification_log"
+    - "RLS enabled on all 8 tables with policies defined per system-design.yaml"
+    - "No destructive operations (no DROP, no ALTER of existing columns)"
+    - "No data backfill required (empty tables)"
+    - "Estimated total migration duration: < 5s (all tables + indexes + policies)"
+    - "Rollback: reverse-order DROP TABLE (safe for greenfield before data is written)"
+    - "VERIFY BEFORE DEPLOY: btree_gist extension must be enabled in Supabase project for availability overlap constraint"
+    - "VERIFY BEFORE DEPLOY: Column-level encryption or Supabase Vault must be configured for OAuth token columns on therapists table"
+    - "IMPLEMENTATION NOTE: Anon RLS policies for bookings/slot_locks are permissive -- booking creation should route through Edge Function or Server Action (service_role) for defense-in-depth"
+    - "IMPLEMENTATION NOTE: Client manage_token RLS approach (via request header) may need refinement -- consider RPC function pattern during implementation"
+    - "IMPLEMENTATION NOTE: Partial unique index on slot_locks (WHERE expires_at > now()) is best-effort -- complement with application-level conflict checks"
+
+security:
+  status: pass
+  blockers: []
+  notes:
+    - "Security patterns document created at .ops/build/v0/security-patterns.md"
+    - "All 7 features analyzed: therapist-setup, booking-page, booking-management, google-calendar-sync, booking-notifications, booking-services, availability"
+    - "Authentication: Google OAuth with PKCE + incremental authorization; Supabase Auth session management"
+    - "Authorization: RLS policies defined for all 8 tables with tenant isolation verified against system-design.yaml"
+    - "Data protection: PHI/PII classification complete; encryption requirements documented (in-transit TLS 1.2+, at-rest AES-256, field-level for OAuth tokens)"
+    - "Input validation: Zod schema requirements defined for all endpoints with field-level constraints"
+    - "API security: rate limiting requirements defined for all public endpoints; CSRF via Server Actions; security headers required"
+    - "Google API: OAuth scope minimization (calendar.events only); token refresh/revocation patterns; data minimization in calendar events"
+    - "Audit logging: all auditable actions cataloged; PHI exclusion rules documented (no plaintext emails, no phone numbers, no tokens)"
+    - "Secrets inventory: 7 secrets identified with storage locations and access rules"
+    - "Threat model: STRIDE analysis completed for all attack vectors; all threats have mitigations defined"
+    - "DESIGN GATE PENDING: Calendar event title format -- PHI exposure risk in Google Calendar (recommend: no full client name)"
+    - "DESIGN GATE PENDING: Slot lock timeout duration (recommend: 10 minutes)"
+    - "DESIGN GATE PENDING: manage_token expiry policy (recommend: 24h after appointment end)"
+    - "DESIGN GATE PENDING: Phone format validation rules (recommend: permissive international, 7-20 digits)"
+    - "DESIGN GATE PENDING: Maximum concurrent slot locks per client (recommend: 3)"
+    - "No spec conflicts found -- no spec-change-requests.yaml needed"
+    - "VERIFY BEFORE DEPLOY: OAuth token encryption (Supabase Vault or app-level AES-256) must be configured"
+    - "VERIFY BEFORE DEPLOY: Security headers (HSTS, CSP, X-Frame-Options, etc.) configured in next.config.js or middleware"
+    - "VERIFY BEFORE DEPLOY: Rate limiting infrastructure (Upstash Redis or equivalent) provisioned"
+  evidence:
+    - ".ops/build/v0/security-patterns.md"
+
+compliance:
+  status: pass
+  blockers: []
+  notes:
+    - "Compliance requirements document created at .ops/build/v0/compliance-requirements.md"
+    - "All 7 features analyzed for HIPAA, PHIPA, and PIPEDA compliance"
+    - "Data classification complete for all 8 tables and all columns -- PHI-adjacent, PII, sensitive-internal, and public levels assigned"
+    - "PHI-adjacent designation applied to bookings table (client_name, client_email, client_phone, booking times) -- therapy booking inherently reveals health service usage"
+    - "Audit trail: 20+ required audit events documented with sanitization rules for before_state/after_state JSONB (strip all PHI fields)"
+    - "Encryption: TDE required for all data at rest; field-level encryption required for OAuth tokens (Supabase Vault/pgsodium)"
+    - "PIPEDA consent: booking form must have unchecked-by-default consent checkbox with clear purpose language"
+    - "Data residency: Canada-only requirement verified for Supabase; Google Calendar data flow analyzed and deemed acceptable with data minimization"
+    - "Data retention periods defined: 10 years for bookings/audit logs (PHIPA Ontario), 2 years for notification logs"
+    - "BAA requirements documented: Supabase, Resend, Vercel BAAs must be signed before production"
+    - "Breach notification process documented for HIPAA, PHIPA, PIPEDA"
+    - "No spec conflicts found -- no spec-change-requests.yaml needed"
+    - "DESIGN GATE PENDING (compliance-impacting): Calendar event title format -- PHI minimization required"
+    - "DESIGN GATE PENDING (compliance-impacting): Consent text content -- PIPEDA requires clear purpose statement"
+    - "DESIGN GATE PENDING (compliance-impacting): manage_token expiry -- affects PHI access surface"
+    - "DESIGN GATE PENDING (compliance-impacting): Session timeout duration -- HIPAA automatic logoff"
+    - "PRE-PRODUCTION BLOCKER: BAAs must be signed with Supabase, Resend, and Vercel"
+    - "PRE-PRODUCTION BLOCKER: Supabase region must be verified as Canadian"
+    - "PRE-PRODUCTION BLOCKER: Field-level encryption configured for OAuth token columns"
+    - "BACKLOG REQUIRED: Automated data retention/deletion (acceptable as manual process for v0 launch)"
+    - "BACKLOG REQUIRED: Automated breach detection/alerting (manual audit log review acceptable for v0)"
+    - "BACKLOG REQUIRED: Formal Subject Access Request workflow (manual via therapist acceptable for v0)"
+  evidence:
+    - ".ops/build/v0/compliance-requirements.md"
